@@ -1,0 +1,6 @@
+{
+  "name": "Lembretes em Áudio",
+  "description": "Aplicativo de lembretes em áudio periódicos com perfis personalizados e horários de descanso.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
