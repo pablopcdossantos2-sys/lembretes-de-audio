@@ -1,8 +1,10 @@
 package com.example
 
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.graphics.Color
 import android.os.Build
 import com.example.data.db.AppDatabase
 import com.example.data.preferences.UserPreferencesRepository
@@ -45,18 +47,23 @@ class AudioReminderApp : Application() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(NotificationManager::class.java)
 
-            // Canal para lembretes em áudio com prioridade alta
+            // Canal para lembretes em áudio com prioridade ALTA (intrusivo com som, vibração e banner)
             val remindersChannel = NotificationChannel(
                 CHANNEL_ID_REMINDERS,
-                "Lembretes Periódicos",
+                "Lembretes Periódicos (Alta Prioridade)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Disparos periódicos de áudios configurados e status de execução"
+                description = "Disparos periódicos de áudios configurados com alertas visuais intrusivos"
                 enableVibration(true)
+                vibrationPattern = longArrayOf(0, 450, 200, 450)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                enableLights(true)
+                lightColor = Color.CYAN
                 setShowBadge(true)
+                setBypassDnd(false)
             }
 
-            // Canal para o serviço em primeiro plano (persistente durante playback)
+            // Canal para o serviço em primeiro plano (persistente em segundo plano)
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID_SERVICE,
                 "Serviço de Execução Contínua",
@@ -66,19 +73,27 @@ class AudioReminderApp : Application() {
                 setShowBadge(false)
             }
 
-            // Canal de alertas de descanso e status
+            // Canal de alertas e avisos imediatos (IMPORTANCE_HIGH para visibilidade proeminente)
             val alertsChannel = NotificationChannel(
                 CHANNEL_ID_ALERTS,
-                "Períodos de Descanso e Avisos",
-                NotificationManager.IMPORTANCE_DEFAULT
+                "Alertas e Avisos de Lembretes",
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Avisos sobre horários de descanso, conflitos de dias e bateria"
+                description = "Avisos sobre horários de descanso, conflitos de dias e status de execução"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 150, 300)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                enableLights(true)
+                lightColor = Color.CYAN
                 setShowBadge(true)
             }
 
             notificationManager.createNotificationChannel(remindersChannel)
             notificationManager.createNotificationChannel(serviceChannel)
             notificationManager.createNotificationChannel(alertsChannel)
+
+            // Registra também o canal de alertas de disparo em tela cheia / heads-up
+            com.example.util.ReminderNotificationHelper.ensureNotificationChannel(this)
         }
     }
 

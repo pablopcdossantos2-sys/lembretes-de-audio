@@ -34,6 +34,8 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     private val scope = CoroutineScope(Dispatchers.Main)
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private var previousAlarmVolume: Int? = null
+
     init {
         try {
             textToSpeech = TextToSpeech(context.applicationContext, this)
@@ -45,7 +47,17 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             isTtsInitialized = true
-            textToSpeech?.language = Locale("pt", "BR")
+            textToSpeech?.language = Locale.forLanguageTag("pt-BR")
+            try {
+                textToSpeech?.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+            } catch (e: Exception) {
+                Log.w("AudioPlayerManager", "Could not set TTS audio attributes", e)
+            }
             pendingTtsText?.let { text ->
                 val callback = pendingTtsOnComplete
                 pendingTtsText = null
@@ -55,21 +67,50 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
         }
     }
 
+    private fun prepareSpeakerVolume(volumeFraction: Float, useAppVolumeOnly: Boolean) {
+        try {
+            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+            if (useAppVolumeOnly || currentVol == 0) {
+                if (previousAlarmVolume == null) {
+                    previousAlarmVolume = currentVol
+                }
+                val desiredVol = (maxVol * volumeFraction).toInt().coerceIn(1, maxVol)
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, desiredVol, 0)
+            }
+        } catch (e: Exception) {
+            Log.w("AudioPlayerManager", "Não foi possível ajustar volume de alarme", e)
+        }
+    }
+
+    private fun restoreSpeakerVolume() {
+        try {
+            previousAlarmVolume?.let { prev ->
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, prev, 0)
+                previousAlarmVolume = null
+            }
+        } catch (e: Exception) {
+            Log.w("AudioPlayerManager", "Não foi possível restaurar volume de alarme", e)
+        }
+    }
+
     fun playAudio(
         uriString: String,
         targetVolume: Float = 1.0f,
         fadeInDurationMs: Long = 0L,
+        useAppVolumeOnly: Boolean = false,
         onComplete: () -> Unit = {}
     ) {
         stop()
         requestAudioFocus()
 
         val clampedTargetVolume = targetVolume.coerceIn(0.01f, 1.0f)
+        prepareSpeakerVolume(clampedTargetVolume, useAppVolumeOnly)
 
         // Check if this is a TTS audio item
         if (uriString.startsWith("tts:")) {
             val textToSpeak = uriString.removePrefix("tts:").replace("_", " ")
-            speakTts(textToSpeak, clampedTargetVolume, onComplete)
+            speakTts(textToSpeak, clampedTargetVolume, useAppVolumeOnly, onComplete)
             return
         }
 
@@ -96,12 +137,14 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 }
 
                 setOnCompletionListener {
+                    restoreSpeakerVolume()
                     abandonAudioFocus()
                     onComplete()
                 }
 
                 setOnErrorListener { _, what, extra ->
                     Log.e("AudioPlayerManager", "MediaPlayer error: what=$what extra=$extra")
+                    restoreSpeakerVolume()
                     abandonAudioFocus()
                     onComplete()
                     true
@@ -122,6 +165,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             }
         } catch (e: Exception) {
             Log.e("AudioPlayerManager", "Error playing audio $uriString", e)
+            restoreSpeakerVolume()
             abandonAudioFocus()
             onComplete()
         }
@@ -130,6 +174,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     fun speakTts(
         text: String,
         volume: Float = 1.0f,
+        useAppVolumeOnly: Boolean = false,
         onComplete: () -> Unit = {}
     ) {
         if (!isTtsInitialized || textToSpeech == null) {
@@ -138,6 +183,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             return
         }
 
+        prepareSpeakerVolume(volume.coerceIn(0.1f, 1.0f), useAppVolumeOnly)
         requestAudioFocus()
         val utteranceId = "tts_${System.currentTimeMillis()}"
 
@@ -145,12 +191,14 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             override fun onStart(utteranceId: String?) {}
             override fun onDone(utteranceId: String?) {
                 mainHandler.post {
+                    restoreSpeakerVolume()
                     abandonAudioFocus()
                     onComplete()
                 }
             }
             override fun onError(utteranceId: String?) {
                 mainHandler.post {
+                    restoreSpeakerVolume()
                     abandonAudioFocus()
                     onComplete()
                 }
@@ -159,8 +207,19 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
 
         val params = android.os.Bundle()
         params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume.coerceIn(0.1f, 1.0f))
+        params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_ALARM)
 
         textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+    }
+
+    fun testSpeaker(
+        volumePercent: Int = 100,
+        useAppVolumeOnly: Boolean = true,
+        onComplete: () -> Unit = {}
+    ) {
+        val volumeFraction = (volumePercent.coerceIn(10, 100)) / 100f
+        val text = "Teste de som: o áudio está sendo reproduzido no alto-falante do celular com sucesso!"
+        speakTts(text, volume = volumeFraction, useAppVolumeOnly = useAppVolumeOnly, onComplete = onComplete)
     }
 
     private fun startFadeIn(player: MediaPlayer, targetVolume: Float, durationMs: Long) {
@@ -196,6 +255,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             textToSpeech?.stop()
         } catch (_: Exception) {}
 
+        restoreSpeakerVolume()
         abandonAudioFocus()
     }
 

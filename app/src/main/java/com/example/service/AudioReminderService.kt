@@ -292,6 +292,7 @@ class AudioReminderService : Service() {
             uriString = audio.uriString,
             targetVolume = targetVolume,
             fadeInDurationMs = fadeInDurationMs,
+            useAppVolumeOnly = prefs.useAppVolumeOnly,
             onComplete = {}
         )
     }
@@ -467,12 +468,29 @@ class AudioReminderService : Service() {
     private fun showAlertNotification(title: String, message: String) {
         try {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+            val openIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("extra_opened_from_notification", true)
+            }
+            val openPendingIntent = PendingIntent.getActivity(
+                this,
+                401,
+                openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             val notification = NotificationCompat.Builder(this, CHANNEL_ALERTS_ID)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setAutoCancel(true)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(openPendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setFullScreenIntent(openPendingIntent, false)
+                .setVibrate(longArrayOf(0, 400, 200, 400))
                 .build()
 
             notificationManager.notify(NOTIFICATION_ID_ALERT, notification)
@@ -496,14 +514,22 @@ class AudioReminderService : Service() {
 
             val alertsChannel = NotificationChannel(
                 CHANNEL_ALERTS_ID,
-                "Avisos de Lembretes",
-                NotificationManager.IMPORTANCE_DEFAULT
+                "Avisos de Lembretes (Alta Prioridade)",
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Avisos de lembretes tocando, ignorados ou perdidos"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 400, 200, 400)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                enableLights(true)
+                setShowBadge(true)
             }
 
             notificationManager.createNotificationChannel(serviceChannel)
             notificationManager.createNotificationChannel(alertsChannel)
+
+            // Garante o canal de alertas visuais intrusivos de disparos
+            com.example.util.ReminderNotificationHelper.ensureNotificationChannel(this)
         }
     }
 

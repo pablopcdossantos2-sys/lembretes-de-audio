@@ -119,4 +119,15 @@ class AudioReminderWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
     }
+
+    @Test
+    fun `notification channels are created with IMPORTANCE_HIGH for intrusive alerts`() {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        com.example.util.ReminderNotificationHelper.ensureNotificationChannel(context)
+
+        val channel = notificationManager.getNotificationChannel(com.example.util.ReminderNotificationHelper.CHANNEL_TRIGGER_ALERTS_ID)
+        assertNotNull(channel)
+        assertEquals(android.app.NotificationManager.IMPORTANCE_HIGH, channel.importance)
+        assertEquals(android.app.Notification.VISIBILITY_PUBLIC, channel.lockscreenVisibility)
+    }
 }

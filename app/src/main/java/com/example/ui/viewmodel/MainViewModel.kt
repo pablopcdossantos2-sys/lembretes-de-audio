@@ -18,14 +18,18 @@ import com.example.domain.scheduler.ScheduleCalculator
 import com.example.player.AudioPlayerManager
 import com.example.service.AudioReminderService
 import com.example.util.DeviceStateHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.InputStream
 import java.io.OutputStream
 import java.time.DayOfWeek
@@ -61,44 +65,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _deviceBatteryIgnored = MutableStateFlow(DeviceStateHelper.isIgnoringBatteryOptimizations(application))
     private val _deviceExactAlarm = MutableStateFlow(DeviceStateHelper.canScheduleExactAlarms(application))
 
-    private val dbDataFlow = combine(
+    private val audiosDomainFlow = database.audioDao().getAllAudiosFlow()
+        .map { audioEntities ->
+            audioEntities.map { entity ->
+                val isMissing = if (entity.audioType == com.example.domain.model.AudioType.TEXT_TO_SPEECH.name) {
+                    entity.ttsText.isNullOrBlank()
+                } else {
+                    try {
+                        val uri = Uri.parse(entity.uriString)
+                        if (uri.scheme == "file") {
+                            val file = java.io.File(uri.path ?: "")
+                            !file.exists() || !file.canRead()
+                        } else {
+                            val testStream = getApplication<Application>().contentResolver.openInputStream(uri)
+                            val accessible = testStream != null
+                            testStream?.close()
+                            !accessible
+                        }
+                    } catch (_: Exception) {
+                        true
+                    }
+                }
+                entity.toDomain(isMissing = isMissing)
+            }
+        }
+        .flowOn(Dispatchers.IO)
+
+    private val profilesDomainFlow = database.profileDao().getAllProfilesWithRestsFlow()
+        .map { profileEntities -> profileEntities.map { it.toDomain() } }
+        .flowOn(Dispatchers.Default)
+
+    private val baseDataFlow = combine(
         prefsRepo.preferencesFlow,
-        database.profileDao().getAllProfilesWithRestsFlow(),
-        database.audioDao().getAllAudiosFlow()
-    ) { prefs, profileEntities, audioEntities ->
-        Triple(prefs, profileEntities, audioEntities)
+        profilesDomainFlow,
+        audiosDomainFlow
+    ) { prefs, domainProfiles, domainAudios ->
+        Triple(prefs, domainProfiles, domainAudios)
     }
 
     val uiState: StateFlow<MainUiState> = combine(
-        dbDataFlow,
+        baseDataFlow,
         _previewingAudioId,
         _deviceBatteryIgnored,
         _deviceExactAlarm
-    ) { (prefs, profileEntities, audioEntities), previewId, batteryIgnored, exactAlarm ->
-
-        val domainAudios = audioEntities.map { entity ->
-            val isMissing = if (entity.audioType == com.example.domain.model.AudioType.TEXT_TO_SPEECH.name) {
-                entity.ttsText.isNullOrBlank()
-            } else {
-                try {
-                    val uri = Uri.parse(entity.uriString)
-                    if (uri.scheme == "file") {
-                        val file = java.io.File(uri.path ?: "")
-                        !file.exists() || !file.canRead()
-                    } else {
-                        val testStream = getApplication<Application>().contentResolver.openInputStream(uri)
-                        val accessible = testStream != null
-                        testStream?.close()
-                        !accessible
-                    }
-                } catch (_: Exception) {
-                    true
-                }
-            }
-            entity.toDomain(isMissing = isMissing)
-        }
-
-        val domainProfiles = profileEntities.map { it.toDomain() }
+    ) { (prefs, domainProfiles, domainAudios), previewId, batteryIgnored, exactAlarm ->
 
         val now = ZonedDateTime.now()
         val nowMillis = System.currentTimeMillis()
@@ -270,8 +280,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             uriString = audio.uriString,
             targetVolume = volume,
             fadeInDurationMs = 0L,
+            useAppVolumeOnly = uiState.value.preferences.useAppVolumeOnly,
             onComplete = {
                 _previewingAudioId.value = null
+            }
+        )
+    }
+
+    fun testLoudSpeaker(volumePercent: Int = 100) {
+        val useAppVolumeOnly = uiState.value.preferences.useAppVolumeOnly
+        previewPlayer.testSpeaker(
+            volumePercent = volumePercent,
+            useAppVolumeOnly = useAppVolumeOnly,
+            onComplete = {
+                viewModelScope.launch {
+                    _userMessage.emit("Teste no alto-falante concluído com sucesso!")
+                }
             }
         )
     }

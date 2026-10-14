@@ -1,8 +1,10 @@
 package com.example.worker
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.graphics.Color
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -303,10 +305,19 @@ class AudioReminderWorker(
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(title)
             .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle("🔔 $title")
+                    .bigText(message)
+            )
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setFullScreenIntent(pendingIntent, true)
+            .setVibrate(longArrayOf(0, 450, 200, 450))
+            .setLights(Color.CYAN, 1000, 500)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
@@ -319,8 +330,14 @@ class AudioReminderWorker(
                 "Lembretes em Segundo Plano (WorkManager)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Disparos periódicos de lembretes e avisos de horário de descanso"
+                description = "Disparos periódicos de lembretes e avisos visuais de alta prioridade"
                 enableVibration(true)
+                vibrationPattern = longArrayOf(0, 450, 200, 450)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                enableLights(true)
+                lightColor = Color.CYAN
+                setShowBadge(true)
+                setBypassDnd(false)
             }
             notificationManager.createNotificationChannel(channel)
         }

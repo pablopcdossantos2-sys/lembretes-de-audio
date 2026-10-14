@@ -35,12 +35,8 @@ object DeviceStateHelper {
         val isModeInCall = audioManager?.mode == AudioManager.MODE_IN_CALL ||
                 audioManager?.mode == AudioManager.MODE_IN_COMMUNICATION
 
-        val isCallStateActive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            telephonyManager?.callState != TelephonyManager.CALL_STATE_IDLE
-        } else {
-            @Suppress("DEPRECATION")
-            telephonyManager?.callState != TelephonyManager.CALL_STATE_IDLE
-        }
+        @Suppress("DEPRECATION")
+        val isCallStateActive = telephonyManager?.callState != TelephonyManager.CALL_STATE_IDLE
 
         return isModeInCall || isCallStateActive
     }

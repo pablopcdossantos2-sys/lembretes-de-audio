@@ -37,15 +37,15 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -1001,7 +1001,7 @@ fun GeneralSettingsContent(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Volume e Áudio", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
@@ -1039,6 +1039,17 @@ fun GeneralSettingsContent(
                             )
                             Text("Usar volume próprio do app (independente)", style = MaterialTheme.typography.bodySmall)
                         }
+                    }
+
+                    FilledTonalButton(
+                        onClick = { viewModel.testLoudSpeaker(prefs.masterVolumePercent) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("test_loudspeaker_button")
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Testar Som no Alto-falante do Celular")
                     }
 
                     HorizontalDivider()
@@ -1382,7 +1393,7 @@ fun BatteryAssistantDialog(
                                 .fillMaxWidth()
                                 .testTag("btn_open_app_details")
                         ) {
-                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Abrir Configurações do App")
                         }
