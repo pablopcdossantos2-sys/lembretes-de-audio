@@ -192,6 +192,10 @@ object ReminderWorkScheduler {
         }
     }
 
+    fun rescheduleNextReminder(context: Context) {
+        scheduleWorkBasedOnActiveSettings(context)
+    }
+
     /**
      * Retorna o fluxo de status dos Workers para exibição na UI.
      */

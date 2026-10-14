@@ -18,4 +18,6 @@ data class ReminderEntity(
     val endMinute: Int = 0,
     val daysOfWeekCsv: String = "1,2,3,4,5,6,7",
     val dateCreated: Long = System.currentTimeMillis()
-)
+) {
+    val periodicityMinutes: Int get() = intervalMinutes
+}

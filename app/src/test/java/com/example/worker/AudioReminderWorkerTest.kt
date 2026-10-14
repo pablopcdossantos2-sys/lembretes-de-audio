@@ -21,7 +21,7 @@ import org.robolectric.annotation.Config
 import java.time.LocalTime
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class AudioReminderWorkerTest {
 
     private lateinit var context: Context

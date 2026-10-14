@@ -155,4 +155,26 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun setQuietHoursEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.QUIET_HOURS_ENABLED] = enabled }
     }
+
+    suspend fun setQuietHoursStart(startHour: Int, startMinute: Int) {
+        context.dataStore.edit {
+            it[Keys.QUIET_HOURS_START_HOUR] = startHour.coerceIn(0, 23)
+            it[Keys.QUIET_HOURS_START_MINUTE] = startMinute.coerceIn(0, 59)
+        }
+    }
+
+    suspend fun setQuietHoursEnd(endHour: Int, endMinute: Int) {
+        context.dataStore.edit {
+            it[Keys.QUIET_HOURS_END_HOUR] = endHour.coerceIn(0, 23)
+            it[Keys.QUIET_HOURS_END_MINUTE] = endMinute.coerceIn(0, 59)
+        }
+    }
+
+    suspend fun setQuietHoursDaysCsv(daysCsv: String) {
+        context.dataStore.edit { it[Keys.QUIET_HOURS_DAYS_CSV] = daysCsv }
+    }
+
+    suspend fun setQuietHoursNotifySilently(notify: Boolean) {
+        context.dataStore.edit { it[Keys.QUIET_HOURS_NOTIFY_SILENTLY] = notify }
+    }
 }

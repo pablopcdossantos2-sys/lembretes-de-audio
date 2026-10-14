@@ -502,7 +502,7 @@ fun AudioItemCard(
                     ) {
                         val typeLabel = when (audio.audioType) {
                             AudioType.AUDIO_FILE -> "Arquivo"
-                            AudioType.RECORDED -> "Gravação"
+                            AudioType.RECORDING -> "Gravação"
                             AudioType.TEXT_TO_SPEECH -> "Voz/Texto"
                         }
 
