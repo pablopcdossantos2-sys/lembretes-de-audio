@@ -17,24 +17,31 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
@@ -93,7 +100,8 @@ import java.util.Locale
 fun SettingsScreen(
     uiState: MainUiState,
     viewModel: MainViewModel,
-    showBatteryDialogDefault: Boolean = false
+    showBatteryDialogDefault: Boolean = false,
+    onDismissBatteryDialog: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -232,7 +240,10 @@ fun SettingsScreen(
     if (showBatteryAssistantDialog) {
         BatteryAssistantDialog(
             isIgnored = uiState.isBatteryOptimizationIgnored,
-            onDismiss = { showBatteryAssistantDialog = false },
+            onDismiss = {
+                showBatteryAssistantDialog = false
+                onDismissBatteryDialog()
+            },
             onRequestIgnore = {
                 val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                     data = Uri.parse("package:${context.packageName}")
@@ -1244,54 +1255,346 @@ fun BatteryAssistantDialog(
     onDismiss: () -> Unit,
     onRequestIgnore: () -> Unit
 ) {
+    val context = LocalContext.current
+    var isCurrentlyIgnored by remember {
+        mutableStateOf(DeviceStateHelper.isIgnoringBatteryOptimizations(context))
+    }
+    var selectedGuideCategory by remember { mutableIntStateOf(0) }
+
+    fun refreshStatus() {
+        isCurrentlyIgnored = DeviceStateHelper.isIgnoringBatteryOptimizations(context)
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Assistente de Bateria e Segundo Plano") },
+        modifier = Modifier.testTag("battery_assistant_dialog"),
+        icon = {
+            Icon(
+                imageVector = if (isCurrentlyIgnored) Icons.Default.BatteryChargingFull else Icons.Default.BatteryAlert,
+                contentDescription = null,
+                tint = if (isCurrentlyIgnored) Color(0xFF2E7D32) else Color(0xFFE65100),
+                modifier = Modifier.size(36.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Otimização de Bateria e Lembretes",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // 1. Live Detection Card
                 item {
-                    Text(
-                        text = "Sistemas Android modernos utilizam o modo Doze para economizar energia, o que pode suspender alarmes em segundo plano.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    val statusBgColor = if (isCurrentlyIgnored) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+                    val statusTextColor = if (isCurrentlyIgnored) Color(0xFF1B5E20) else Color(0xFFE65100)
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("battery_status_indicator"),
+                        colors = CardDefaults.cardColors(containerColor = statusBgColor),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isCurrentlyIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = statusTextColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isCurrentlyIgnored) "Status: Otimização Desativada (Ideal)" else "Status: Otimização Ativa (Restrito)",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = statusTextColor
+                                    )
+                                }
+                                TextButton(
+                                    onClick = { refreshStatus() },
+                                    modifier = Modifier.testTag("btn_refresh_battery_status")
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "Verificar", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Verificar", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+
+                            Text(
+                                text = if (isCurrentlyIgnored) {
+                                    "Excelente! O aplicativo está na lista de permissões (whitelist) do Android. Os lembretes e áudios tocarão pontualmente mesmo com o aparelho bloqueado."
+                                } else {
+                                    "Atenção: A otimização de bateria do sistema está ATIVA para este app. O modo Doze do Android pode atrasar ou silenciar lembretes quando a tela estiver desligada."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = statusTextColor
+                            )
+                        }
+                    }
                 }
+
+                // 2. Action Shortcuts
                 item {
-                    Text(
-                        text = "1. Isenção da Otimização do Android",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Text(
-                        text = "Toque no botão abaixo para conceder isenção direta de bateria ao app.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                onRequestIgnore()
+                                refreshStatus()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_request_battery_whitelist")
+                        ) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Solicitar Isenção Direta")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_open_app_details")
+                        ) {
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Abrir Configurações do App")
+                        }
+                    }
                 }
+
+                // 3. Step-by-step Guide Selector
                 item {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Text(
-                        text = "2. Dicas específicas por fabricante:",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall
+                        text = "Passo a Passo para Whitelist",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "• Xiaomi (MIUI/HyperOS): Em Configurações > Apps > Lembretes em Áudio, ative 'Início Automático' e defina economia de bateria para 'Sem restrições'.\n\n• Samsung (One UI): Em Configurações > Bateria > Limites de uso em 2º plano, verifique se o app não está em 'Aplicativos em suspensão profunda'.\n\n• Motorola: Desative a otimização de bateria nas configurações do app.\n\n• Huawei: Ative 'Gerenciamento manual' no inicializador de aplicativos.",
+                        text = "Selecione o modelo do seu dispositivo para ver o guia detalhado:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedGuideCategory == 0,
+                            onClick = { selectedGuideCategory = 0 },
+                            label = { Text("Padrão / Pixel / Moto") },
+                            leadingIcon = {
+                                if (selectedGuideCategory == 0) Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        )
+                        FilterChip(
+                            selected = selectedGuideCategory == 1,
+                            onClick = { selectedGuideCategory = 1 },
+                            label = { Text("Samsung (One UI)") },
+                            leadingIcon = {
+                                if (selectedGuideCategory == 1) Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        )
+                        FilterChip(
+                            selected = selectedGuideCategory == 2,
+                            onClick = { selectedGuideCategory = 2 },
+                            label = { Text("Xiaomi / Redmi (MIUI)") },
+                            leadingIcon = {
+                                if (selectedGuideCategory == 2) Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        )
+                        FilterChip(
+                            selected = selectedGuideCategory == 3,
+                            onClick = { selectedGuideCategory = 3 },
+                            label = { Text("Outros Fabricantes") },
+                            leadingIcon = {
+                                if (selectedGuideCategory == 3) Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        )
+                    }
+                }
+
+                // 4. Instructions Card based on Selected Tab
+                item {
+                    when (selectedGuideCategory) {
+                        0 -> {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "📱 Android Padrão (Pixel, Motorola, etc.)",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "1. Toque no botão 'Solicitar Isenção Direta' acima e selecione 'Permitir' na caixa de diálogo do sistema.\n\n" +
+                                                "2. Caso o pop-up não apareça, toque em 'Abrir Configurações do App'.\n\n" +
+                                                "3. Toque em 'Bateria' (ou 'Uso de bateria do aplicativo').\n\n" +
+                                                "4. Selecione a opção 'Sem restrições' (Unrestricted) em vez de 'Otimizado'.\n\n" +
+                                                "5. Retorne ao app e toque em 'Verificar' para confirmar o status liberado.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.35
+                                    )
+                                }
+                            }
+                        }
+                        1 -> {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "📱 Samsung Galaxy (One UI)",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "1. Toque em 'Abrir Configurações do App' > toque em 'Bateria' e escolha 'Sem restrições'.\n\n" +
+                                                "2. Abra as Configurações do aparelho > Bateria > 'Limites de uso em segundo plano'.\n\n" +
+                                                "3. Toque em 'Aplicativos que nunca são suspensos' > toque no botão '+' no topo e adicione o 'Lembretes em Áudio'.\n\n" +
+                                                "4. Verifique também se o app não está marcado na lista de 'Aplicativos em suspensão profunda'.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.35
+                                    )
+                                }
+                            }
+                        }
+                        2 -> {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "📱 Xiaomi, Redmi & POCO (MIUI / HyperOS)",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "1. Toque em 'Abrir Configurações do App' e ative a chave 'Início Automático' (Autostart).\n\n" +
+                                                "2. Na mesma tela, toque em 'Economia de bateria' e selecione 'Nenhuma restrição' (Sem restrições).\n\n" +
+                                                "3. Abra a tela de apps recentes (multitarefa), mantenha o dedo pressionado no app e toque no ícone de Cadeado para travá-lo na RAM.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.35
+                                    )
+                                }
+                            }
+                        }
+                        3 -> {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "📱 Huawei, Realme, OPPO, Vivo, ASUS",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "1. Vá em Configurações > Aplicativos > Lembretes em Áudio.\n\n" +
+                                                "2. Em 'Inicialização de apps' ou 'Gerenciador de Inicialização', desative o modo automático e ative 'Permitir execução em segundo plano' e 'Início automático'.\n\n" +
+                                                "3. Em 'Otimização de Bateria', marque a opção 'Não permitir otimização'.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        lineHeight = MaterialTheme.typography.bodySmall.lineHeight * 1.35
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5. Additional System Note
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Dica: No Android 12 ou superior, verifique também se a permissão 'Alarmes e lembretes' está habilitada para permitir disparos pontuais no horário exato.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = {
-                onRequestIgnore()
-                onDismiss()
-            }) {
-                Text("Desativar otimização")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Fechar")
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("btn_close_battery_dialog")
+            ) {
+                Text("Entendi")
             }
         }
     )
 }
+

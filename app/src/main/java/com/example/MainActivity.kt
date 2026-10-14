@@ -252,7 +252,10 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
                             uiState = uiState,
                             viewModel = viewModel,
                             onNavigateToLibrary = { currentScreen = NavigationScreen.LIBRARY },
-                            onOpenBatteryDialog = { openBatteryAssistantDialog = true }
+                            onOpenBatteryDialog = {
+                                openBatteryAssistantDialog = true
+                                currentScreen = NavigationScreen.SETTINGS
+                            }
                         )
                         NavigationScreen.PROFILES -> ProfilesScreen(
                             uiState = uiState,
@@ -266,7 +269,8 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
                         NavigationScreen.SETTINGS -> SettingsScreen(
                             uiState = uiState,
                             viewModel = viewModel,
-                            showBatteryDialogDefault = openBatteryAssistantDialog
+                            showBatteryDialogDefault = openBatteryAssistantDialog,
+                            onDismissBatteryDialog = { openBatteryAssistantDialog = false }
                         )
                         NavigationScreen.RECORD -> {
                             val lembreteViewModel: com.example.ui.viewmodel.LembreteViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
