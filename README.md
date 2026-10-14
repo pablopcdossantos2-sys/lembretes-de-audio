@@ -1,51 +1,43 @@
-# Lembretes em Áudio
+# Lembretes em Áudio (Android)
 
-Aplicativo React moderno (TypeScript + Vite + Tailwind CSS) para reprodução periódica de áudios, gravações de voz e afirmações selecionadas pelo usuário em intervalos fixos, respeitando múltiplos períodos de descanso e rotinas personalizadas por dia da semana.
+Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose** (Material Design 3) para reprodução periódica de áudios, gravações de voz e lembretes sonoros em intervalos configuráveis, respeitando múltiplos períodos de descanso, horários silenciosos, rotinas por dia da semana e o estado do dispositivo.
 
 ---
 
 ## Funcionalidades Principais
 
-1. **Perfis de Funcionamento Personalizados:**
-   - Janelas de operação personalizadas (com suporte a horários que cruzam a meia-noite).
-   - Intervalos de repetição flexíveis (5 a 120 minutos).
-   - Dias da semana configuráveis (Segunda a Domingo).
-   - Múltiplos períodos de descanso (ex.: Almoço, Sono) com mesclagem automática de intervalos.
-   - Políticas de retomada pós-descanso: *Próxima marca da grade* (`NEXT_GRID_MARK`) ou *Imediato no fim do descanso* (`AT_REST_END`).
-   - Modos de reprodução: Sequencial, Aleatório com pesos ponderados (1 a 5 estrelas) e Áudio fixo específico.
+1. **Perfis de Funcionamento e Agendamento Flexível:**
+   - Janelas de operação personalizadas com suporte a horários que cruzam a meia-noite.
+   - Intervalos de repetição de 5 a 120 minutos.
+   - Seleção de dias da semana (Segunda a Domingo) com detecção e aviso de conflitos de prioridade.
+   - **Múltiplos Períodos de Descanso (*Resting Periods*):** Silenciamento automático durante horários de repouso (ex: Almoço 12:00 às 13:00, Pausa para café 16:00 às 16:30).
+   - Políticas de retomada pós-descanso configuráveis (`NEXT_GRID_MARK`, `NEXT_FULL_INTERVAL`, `RETRY_MISSED`).
+   - Modos de reprodução: Sequencial, Aleatório Ponderado por pesos (1 a 5) ou Áudio específico.
    - Suavização de volume (*Fade-in*) global ou personalizada por perfil (0.5s a 10s).
 
-2. **Biblioteca de Áudios Versátil:**
-   - **Upload de Arquivos de Áudio:** Suporte a arquivos locais (MP3, WAV, OGG, M4A, FLAC, WEBM) com armazenamento em IndexedDB.
-   - **Gravador de Voz Embutido:** Gravação direta pelo microfone com visualizador de onda em tempo real (Waveform Canvas), temporizador e controle de reprodução antes de salvar.
-   - **Texto para Fala (TTS):** Geração de fala sintetizada via Web Speech API com teste prévio imediato.
-   - Controle individual de volume (0 a 100%) e peso no sorteio para cada item da biblioteca.
+2. **Biblioteca de Áudios Completa:**
+   - **Gravação de Áudio com Microfone:** Gravador integrado com visualizador de onda em tempo real, temporizador, pause/resume e reprodução de prévia.
+   - **Importação de Arquivos:** Suporte a arquivos locais (MP3, WAV, M4A, OGG) via seletor de arquivos do sistema.
+   - **Texto para Fala (TTS):** Síntese de voz nativa do Android (Text-to-Speech) em Português do Brasil.
+   - Controle individual de volume (0 a 100%) e peso no sorteio para cada áudio.
 
-3. **Agendamento e Monitoramento:**
-   - Cálculo e previsão dos próximos 5 disparos na tela inicial.
-   - Controle de silêncio rápido (*Snooze* de 30 min, 1h, 2h ou retomada manual).
-   - Suporte a notificações visuais e sonoras em navegadores web.
-   - Botão para teste de disparo imediato.
+3. **Arquitetura e Robustez em Segundo Plano:**
+   - **Room Database:** Persistência local segura de áudios, perfis, períodos de descanso e lembretes gravados.
+   - **WorkManager & Exact Alarms:** Agendamentos de alta precisão via `AlarmManager` e `CoroutineWorker`.
+   - **Foreground Service:** Serviço de execução em primeiro plano com tipo `mediaPlayback` para confiabilidade em tela bloqueada.
+   - **Tratamento de Estado do Dispositivo:** Respeita chamadas telefônicas em andamento, modo Não Perturbe (DND) e fones Bluetooth.
+   - **Assistente de Otimização de Bateria:** Verificação e atalhos para desativar otimizações de bateria agressivas do sistema.
 
 4. **Backup e Portabilidade:**
-   - Exportação e importação completa de dados, áudios e configurações em formato JSON.
+   - Exportação e importação completa de dados e configurações em formato JSON.
 
 ---
 
-## Como Executar
+## Arquitetura do Projeto
 
-1. **Instalação de Dependências:**
-   ```bash
-   npm install
-   ```
-
-2. **Servidor de Desenvolvimento:**
-   ```bash
-   npm run dev
-   ```
-   O app estará disponível em `http://localhost:3000`.
-
-3. **Compilação de Produção:**
-   ```bash
-   npm run build
-   ```
+- **Linguagem:** Kotlin 2.1
+- **UI Toolkit:** Jetpack Compose (Material Design 3)
+- **Banco de Dados:** Room Database
+- **Preferências:** Jetpack DataStore Preferences
+- **Segundo Plano:** WorkManager, Foreground Service, BroadcastReceivers
+- **Áudio:** Android MediaPlayer, AudioFocusManager, TextToSpeech

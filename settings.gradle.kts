@@ -1,1 +1,1 @@
-rootProject.name = "lembretes-de-audio"
+rootProject.name = "Lembretes em Áudio"

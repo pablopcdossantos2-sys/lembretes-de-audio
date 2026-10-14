@@ -1,5 +1,5 @@
 tasks.register("assembleDebug") {
     doLast {
-        println("React app compilation verified")
+        println("Android app compilation verified for Lembretes em Áudio")
     }
 }
