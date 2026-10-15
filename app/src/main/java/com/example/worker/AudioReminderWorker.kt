@@ -182,6 +182,13 @@ class AudioReminderWorker(
             ?: "Lembrete Periódico"
 
         if (audioToPlayUri != null) {
+            com.example.util.AudioDiagnosticLogger.log(
+                level = com.example.util.DiagnosticLevel.INFO,
+                category = com.example.util.DiagnosticCategory.WORKER,
+                message = "WorkManager acionou disparo de lembrete: \"$reminderTitle\"",
+                details = "URI: $audioToPlayUri"
+            )
+
             // Exibe alerta visual na tela de bloqueio com alta prioridade e botões de ação
             com.example.util.ReminderNotificationHelper.showTriggerVisualAlert(
                 context = context,
@@ -206,6 +213,7 @@ class AudioReminderWorker(
                     uriString = audioToPlayUri,
                     targetVolume = volumeFloat,
                     fadeInDurationMs = fadeInDurationMs,
+                    audioTitle = reminderTitle,
                     onComplete = {
                         playbackDone.complete(Unit)
                     }

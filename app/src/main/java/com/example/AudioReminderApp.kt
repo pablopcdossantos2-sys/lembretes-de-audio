@@ -29,13 +29,15 @@ class AudioReminderApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.example.util.AudioDiagnosticLogger.init(this)
         createNotificationChannels()
 
-        // Sincroniza o agendamento em background se o aplicativo estiver habilitado
+        // Sincroniza o serviço e o agendamento em background se o aplicativo estiver habilitado
         applicationScope.launch {
             try {
                 val prefs = preferencesRepository.preferencesFlow.first()
                 if (prefs.isAppMasterEnabled) {
+                    com.example.service.AudioReminderService.startOrRefresh(applicationContext)
                     ReminderWorkScheduler.rescheduleNextReminder(applicationContext)
                 }
             } catch (_: Exception) {

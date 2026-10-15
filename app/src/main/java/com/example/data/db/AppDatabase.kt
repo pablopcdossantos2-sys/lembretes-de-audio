@@ -112,6 +112,24 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 profileDao.upsertProfileWithRests(weekend, weekendRests)
 
+                // Perfil Rotina Diária (Todos os dias, 07:00 às 23:00, a cada 15 min, garantindo funcionamento contínuo)
+                val daily = ProfileEntity(
+                    name = "Rotina Diária",
+                    isEnabled = true,
+                    priority = 3,
+                    daysOfWeekCsv = "1,2,3,4,5,6,7",
+                    startHour = 7,
+                    startMinute = 0,
+                    endHour = 23,
+                    endMinute = 0,
+                    intervalMinutes = 15,
+                    playbackOrder = "SEQUENTIAL",
+                    resumePolicy = "NEXT_GRID_MARK",
+                    fadeInOverrideEnabled = false,
+                    fadeInDurationSeconds = 2.0f
+                )
+                profileDao.upsertProfileWithRests(daily, emptyList())
+
                 // Adiciona áudios iniciais de demonstração (TTS para funcionar imediatamente sem arquivos locais)
                 val audioDao = database.audioDao()
                 val demoAudio1 = AudioItemEntity(

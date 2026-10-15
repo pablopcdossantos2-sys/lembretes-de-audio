@@ -23,7 +23,10 @@ import com.example.domain.model.ScheduledTrigger
 import com.example.domain.scheduler.ScheduleCalculator
 import com.example.player.AudioPlayerManager
 import com.example.receiver.BootAndAlarmReceiver
+import com.example.util.AudioDiagnosticLogger
 import com.example.util.DeviceStateHelper
+import com.example.util.DiagnosticCategory
+import com.example.util.DiagnosticLevel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -97,8 +100,32 @@ class AudioReminderService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Garante que startForeground seja chamado imediatamente para cumprir o contrato do Android O+
+        try {
+            val notification = buildForegroundNotification("Monitorando lembretes em áudio", false)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID_SERVICE,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(NOTIFICATION_ID_SERVICE, notification)
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+
+        val actionName = intent?.action ?: "ACTION_DEFAULT"
+        AudioDiagnosticLogger.logServiceEvent(
+            action = actionName,
+            message = "Serviço ativo em primeiro plano",
+            details = "Monitorando lembretes com prioridade de mídia"
+        )
+
         when (intent?.action) {
             ACTION_STOP_SERVICE -> {
+                AudioDiagnosticLogger.logServiceEvent(ACTION_STOP_SERVICE, "Parando serviço de lembretes")
                 serviceScope.launch {
                     preferencesRepo.setAppMasterEnabled(false)
                     cancelExistingAlarm()
@@ -109,6 +136,7 @@ class AudioReminderService : Service() {
             }
             ACTION_SNOOZE -> {
                 val minutes = intent.getIntExtra(EXTRA_SNOOZE_MINUTES, 60)
+                AudioDiagnosticLogger.logServiceEvent(ACTION_SNOOZE, "Silenciando lembretes por $minutes minutos")
                 serviceScope.launch {
                     val snoozeUntil = System.currentTimeMillis() + (minutes * 60 * 1000L)
                     preferencesRepo.setSnoozeUntilEpochMillis(snoozeUntil)
@@ -117,6 +145,7 @@ class AudioReminderService : Service() {
                 }
             }
             ACTION_RESUME -> {
+                AudioDiagnosticLogger.logServiceEvent(ACTION_RESUME, "Retomando lembretes do modo soneca")
                 serviceScope.launch {
                     preferencesRepo.setSnoozeUntilEpochMillis(0L)
                     refreshScheduleAndNotification()
@@ -137,99 +166,199 @@ class AudioReminderService : Service() {
     }
 
     private fun handleAlarmTrigger(expectedMillis: Long) {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        val wakeLock = powerManager?.newWakeLock(
+            android.os.PowerManager.PARTIAL_WAKE_LOCK,
+            "AudioReminder:PlaybackWakeLock"
+        )?.apply {
+            acquire(180_000L)
+        }
+
         serviceScope.launch {
-            val prefs = preferencesRepo.getPreferences()
-            if (!prefs.isAppMasterEnabled) {
-                stopSelf()
-                return@launch
-            }
+            try {
+                val prefs = preferencesRepo.getPreferences()
+                if (!prefs.isAppMasterEnabled) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.WARN,
+                        category = DiagnosticCategory.SERVICE,
+                        message = "Disparo ignorado: aplicativo mestre está desligado",
+                        details = "Ative a chave principal na tela inicial para habilitar"
+                    )
+                    stopSelf()
+                    return@launch
+                }
 
-            val now = ZonedDateTime.now()
-            val nowMillis = System.currentTimeMillis()
+                val now = ZonedDateTime.now()
+                val nowMillis = System.currentTimeMillis()
 
-            // 1. Check if missed (> 2 minutes behind expected trigger time)
-            if (expectedMillis > 0 && (nowMillis - expectedMillis) > 120_000L) {
-                val missedTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(expectedMillis), ZoneId.systemDefault())
-                showAlertNotification(
-                    title = "Lembrete perdido",
-                    message = "Lembrete perdido às ${missedTime.format(timeFormatter)}"
+                AudioDiagnosticLogger.logAlarmTriggered(
+                    expectedMillis = expectedMillis,
+                    actualMillis = nowMillis,
+                    profileName = null
                 )
+
+                // 1. Check if missed (> 3 minutes behind expected trigger time)
+                if (expectedMillis > 0 && (nowMillis - expectedMillis) > 180_000L) {
+                    val missedTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(expectedMillis), ZoneId.systemDefault())
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.WARN,
+                        category = DiagnosticCategory.ALARM,
+                        message = "Lembrete com atraso excessivo de ${(nowMillis - expectedMillis) / 1000}s",
+                        details = "Esperado às ${missedTime.format(timeFormatter)}"
+                    )
+                    showAlertNotification(
+                        title = "Lembrete perdido",
+                        message = "Lembrete perdido às ${missedTime.format(timeFormatter)}"
+                    )
+                    refreshScheduleAndNotification()
+                    return@launch
+                }
+
+                // 2. Check if currently snoozed
+                if (prefs.snoozeUntilEpochMillis > nowMillis) {
+                    val snoozeTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(prefs.snoozeUntilEpochMillis), ZoneId.systemDefault())
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.INFO,
+                        category = DiagnosticCategory.SERVICE,
+                        message = "Lembrete ignorado: modo soneca ativo até ${snoozeTime.format(timeFormatter)}"
+                    )
+                    refreshScheduleAndNotification()
+                    return@launch
+                }
+
+                // 3. Load active profiles, audios and reminders
+                val profiles = database.profileDao().getAllProfilesWithRests().map { it.toDomain() }
+                val activeAudios = database.audioDao().getActiveAudios().map { it.toDomain() }
+                val activeReminders = database.reminderDao().getActiveReminders()
+
+                if (activeAudios.isEmpty() && activeReminders.isEmpty()) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.WARN,
+                        category = DiagnosticCategory.PLAYBACK,
+                        message = "Nenhum áudio ativo na biblioteca nem lembretes cadastrados",
+                        details = "Adicione áudios na biblioteca ou grave um lembrete para ouvir"
+                    )
+                    showAlertNotification(
+                        title = "Nenhum áudio ativo",
+                        message = "Adicione áudios ou grave lembretes para tocar."
+                    )
+                    refreshScheduleAndNotification()
+                    return@launch
+                }
+
+                // Encontra perfil ativo ou cria perfil temporário a partir de lembretes ativos
+                var activeProfile = ScheduleCalculator.findActiveProfileFor(now, profiles)
+                if (activeProfile == null && activeReminders.isNotEmpty()) {
+                    val reminder = activeReminders.firstOrNull { rem ->
+                        val start = java.time.LocalTime.of(rem.startHour, rem.startMinute)
+                        val end = java.time.LocalTime.of(rem.endHour, rem.endMinute)
+                        val t = now.toLocalTime()
+                        if (start == end || start.isAfter(end)) {
+                            !t.isBefore(start) || t.isBefore(end)
+                        } else {
+                            !t.isBefore(start) && t.isBefore(end)
+                        }
+                    } ?: activeReminders.first()
+
+                    activeProfile = Profile(
+                        id = reminder.id,
+                        name = reminder.title,
+                        daysOfWeek = setOf(now.dayOfWeek),
+                        startTime = java.time.LocalTime.of(reminder.startHour, reminder.startMinute),
+                        endTime = java.time.LocalTime.of(reminder.endHour, reminder.endMinute),
+                        intervalMinutes = reminder.intervalMinutes,
+                        playbackOrder = PlaybackOrder.SPECIFIC
+                    )
+                }
+
+                // 4. Check if currently in rest period (if profile defines rests)
+                if (activeProfile != null && activeProfile.restingPeriods.isNotEmpty()) {
+                    val mergedRests = ScheduleCalculator.mergeRestingPeriods(activeProfile.restingPeriods)
+                    val currentLocalTime = now.toLocalTime()
+                    if (ScheduleCalculator.isTimeInRestingPeriod(currentLocalTime, mergedRests)) {
+                        val coveringRest = ScheduleCalculator.findCoveringRest(currentLocalTime, mergedRests)
+                        AudioDiagnosticLogger.log(
+                            level = DiagnosticLevel.INFO,
+                            category = DiagnosticCategory.SERVICE,
+                            message = "Disparo pausado: Período de descanso ativo (${coveringRest?.label ?: "Descanso"})",
+                            details = "Descanso até ${coveringRest?.endTime?.format(timeFormatter) ?: "em breve"}"
+                        )
+                        refreshScheduleAndNotification()
+                        return@launch
+                    }
+                }
+
+                // 5. Check phone call
+                if (DeviceStateHelper.isPhoneCallActive(this@AudioReminderService)) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.WARN,
+                        category = DiagnosticCategory.ROUTING,
+                        message = "Disparo pausado: Chamada telefônica em andamento"
+                    )
+                    showAlertNotification(
+                        title = "Lembrete pausado",
+                        message = "Chamada telefônica em andamento."
+                    )
+                    refreshScheduleAndNotification()
+                    return@launch
+                }
+
+                // 6. Check Do Not Disturb
+                if (prefs.respectDoNotDisturb && DeviceStateHelper.isDoNotDisturbActive(this@AudioReminderService)) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.WARN,
+                        category = DiagnosticCategory.ROUTING,
+                        message = "Disparo silenciado: Modo Não Perturbe do sistema ativo"
+                    )
+                    showAlertNotification(
+                        title = "Lembrete silenciado",
+                        message = "Modo Não perturbe do sistema ativo."
+                    )
+                    refreshScheduleAndNotification()
+                    return@launch
+                }
+
+                // 7. Select and play audio (executa sempre, com ou sem fone de ouvido)
+                val selectedAudio: AudioItem? = if (activeProfile != null && activeAudios.isNotEmpty()) {
+                    selectAudioForPlayback(activeProfile, activeAudios, prefs.lastSequentialIndex)
+                } else null
+                    ?: activeAudios.firstOrNull()
+                    ?: activeReminders.firstOrNull()?.let { rem ->
+                        AudioItem(
+                            id = rem.id,
+                            uriString = rem.audioUri ?: "tts:${rem.title.replace(" ", "_")}",
+                            label = rem.title,
+                            isActive = true
+                        )
+                    }
+
+                if (selectedAudio != null) {
+                    val playbackDone = kotlinx.coroutines.CompletableDeferred<Unit>()
+                    playAudioWithSettings(
+                        audio = selectedAudio,
+                        profile = activeProfile,
+                        prefs = prefs,
+                        onPlaybackComplete = {
+                            playbackDone.complete(Unit)
+                        }
+                    )
+
+                    try {
+                        kotlinx.coroutines.withTimeoutOrNull(60_000L) {
+                            playbackDone.await()
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                // Agenda o próximo alarme com precisão
                 refreshScheduleAndNotification()
-                return@launch
+            } finally {
+                try {
+                    if (wakeLock?.isHeld == true) {
+                        wakeLock.release()
+                    }
+                } catch (_: Exception) {}
             }
-
-            // 2. Check if currently snoozed
-            if (prefs.snoozeUntilEpochMillis > nowMillis) {
-                refreshScheduleAndNotification()
-                return@launch
-            }
-
-            // 3. Load active profiles and audios
-            val profiles = database.profileDao().getAllProfilesWithRests().map { it.toDomain() }
-            val activeAudios = database.audioDao().getActiveAudios().map { it.toDomain() }
-
-            if (activeAudios.isEmpty()) {
-                showAlertNotification(
-                    title = "Nenhum áudio ativo",
-                    message = "Adicione áudios ativos para tocar lembretes."
-                )
-                refreshScheduleAndNotification()
-                return@launch
-            }
-
-            val activeProfile = ScheduleCalculator.findActiveProfileFor(now, profiles)
-            if (activeProfile == null) {
-                refreshScheduleAndNotification()
-                return@launch
-            }
-
-            // 4. Check if currently in rest period
-            val mergedRests = ScheduleCalculator.mergeRestingPeriods(activeProfile.restingPeriods)
-            val currentLocalTime = now.toLocalTime()
-            if (ScheduleCalculator.isTimeInRestingPeriod(currentLocalTime, mergedRests)) {
-                refreshScheduleAndNotification()
-                return@launch
-            }
-
-            // 5. Check phone call
-            if (DeviceStateHelper.isPhoneCallActive(this@AudioReminderService)) {
-                showAlertNotification(
-                    title = "Lembrete ignorado",
-                    message = "Lembrete ignorado: em chamada"
-                )
-                refreshScheduleAndNotification()
-                return@launch
-            }
-
-            // 6. Check Bluetooth audio devices
-            if (DeviceStateHelper.isBluetoothAudioConnected(this@AudioReminderService)) {
-                showAlertNotification(
-                    title = "Lembrete ignorado",
-                    message = "Lembrete ignorado: fone Bluetooth conectado"
-                )
-                refreshScheduleAndNotification()
-                return@launch
-            }
-
-            // 7. Check Do Not Disturb
-            if (prefs.respectDoNotDisturb && DeviceStateHelper.isDoNotDisturbActive(this@AudioReminderService)) {
-                showAlertNotification(
-                    title = "Lembrete ignorado",
-                    message = "Lembrete ignorado: modo Não perturbe ativo"
-                )
-                refreshScheduleAndNotification()
-                return@launch
-            }
-
-            // 8. Select audio to play
-            val selectedAudio = selectAudioForPlayback(activeProfile, activeAudios, prefs.lastSequentialIndex)
-
-            if (selectedAudio != null) {
-                playAudioWithSettings(selectedAudio, activeProfile, prefs)
-            }
-
-            // Schedule the NEXT alarm immediately
-            refreshScheduleAndNotification()
         }
     }
 
@@ -262,13 +391,14 @@ class AudioReminderService : Service() {
 
     private fun playAudioWithSettings(
         audio: AudioItem,
-        profile: Profile,
-        prefs: com.example.data.preferences.UserPreferences
+        profile: Profile?,
+        prefs: com.example.data.preferences.UserPreferences,
+        onPlaybackComplete: () -> Unit = {}
     ) {
         val targetVolume = (prefs.masterVolumePercent * audio.volumePercent) / 10000f
 
-        val fadeInEnabled = if (profile.fadeInOverrideEnabled) true else prefs.fadeInEnabled
-        val fadeInSeconds = if (profile.fadeInOverrideEnabled) {
+        val fadeInEnabled = if (profile?.fadeInOverrideEnabled == true) true else prefs.fadeInEnabled
+        val fadeInSeconds = if (profile?.fadeInOverrideEnabled == true) {
             profile.fadeInDurationSeconds
         } else {
             prefs.fadeInDurationSeconds
@@ -282,8 +412,8 @@ class AudioReminderService : Service() {
         if (prefs.showLabelInNotification) {
             com.example.util.ReminderNotificationHelper.showTriggerVisualAlert(
                 context = this,
-                title = "Tocando agora: ${audio.label}",
-                message = if (audio.ttsText.isNullOrBlank()) "Lembrete sonoro em reprodução." else audio.ttsText,
+                title = "Lembrete: ${audio.label}",
+                message = if (audio.ttsText.isNullOrBlank()) "Lembrete em reprodução nos fones / alto-falante." else audio.ttsText,
                 reminderId = audio.id
             )
         }
@@ -293,7 +423,9 @@ class AudioReminderService : Service() {
             targetVolume = targetVolume,
             fadeInDurationMs = fadeInDurationMs,
             useAppVolumeOnly = prefs.useAppVolumeOnly,
-            onComplete = {}
+            audioTitle = audio.label,
+            ttsText = audio.ttsText,
+            onComplete = onPlaybackComplete
         )
     }
 
@@ -363,6 +495,7 @@ class AudioReminderService : Service() {
     private fun scheduleExactAlarm(triggerTime: ZonedDateTime) {
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val triggerMillis = triggerTime.toInstant().toEpochMilli()
+        val triggerTimeStr = triggerTime.format(timeFormatter)
 
         val intent = Intent(this, BootAndAlarmReceiver::class.java).apply {
             action = ACTION_TRIGGER_ALARM
@@ -376,23 +509,91 @@ class AudioReminderService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val canExact = DeviceStateHelper.canScheduleExactAlarms(this)
+        var usedMethod = "Desconhecido"
+
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (canExact) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerMillis,
+                        pendingIntent
+                    )
+                    usedMethod = "setExactAndAllowWhileIdle (Exato)"
+                } else {
+                    // Fallback usando AlarmClock (garante despertar mesmo sem permissão explícita de alarme exato)
+                    val showIntent = PendingIntent.getActivity(
+                        this,
+                        2002,
+                        Intent(this, MainActivity::class.java),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerMillis, showIntent)
+                    alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+                    usedMethod = "setAlarmClock (Alarme Relógio Prioritário)"
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerMillis,
                     pendingIntent
                 )
+                usedMethod = "setExactAndAllowWhileIdle"
             } else {
                 alarmManager.setExact(
                     AlarmManager.RTC_WAKEUP,
                     triggerMillis,
                     pendingIntent
                 )
+                usedMethod = "setExact"
             }
+
+            AudioDiagnosticLogger.logAlarmScheduled(
+                triggerTimeStr = triggerTimeStr,
+                triggerMillis = triggerMillis,
+                method = usedMethod,
+                canScheduleExact = canExact
+            )
         } catch (e: Throwable) {
-            e.printStackTrace()
+            AudioDiagnosticLogger.log(
+                level = DiagnosticLevel.WARN,
+                category = DiagnosticCategory.ALARM,
+                message = "Falha no agendamento exato, acionando fallback: ${e.message}",
+                details = "Método tentado: $usedMethod"
+            )
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerMillis,
+                        pendingIntent
+                    )
+                }
+                AudioDiagnosticLogger.logAlarmScheduled(
+                    triggerTimeStr = triggerTimeStr,
+                    triggerMillis = triggerMillis,
+                    method = "setAndAllowWhileIdle (Aproximado)",
+                    canScheduleExact = false
+                )
+            } catch (t: Throwable) {
+                AudioDiagnosticLogger.log(
+                    level = DiagnosticLevel.ERROR,
+                    category = DiagnosticCategory.ALARM,
+                    message = "Falha crítica ao agendar alarme no sistema: ${t.message}"
+                )
+            }
         }
+
+        // Agenda backup via WorkManager com delay correspondente
+        val delayMs = (triggerMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        com.example.worker.ReminderWorkScheduler.scheduleOneTimeReminderWork(this, delayMs)
     }
 
     private fun cancelExistingAlarm() {

@@ -65,6 +65,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _userMessage = MutableSharedFlow<String>()
     val userMessage: SharedFlow<String> = _userMessage
 
+    val diagnosticLogs = com.example.util.AudioDiagnosticLogger.logsFlow
+
+    fun clearDiagnosticLogs() {
+        com.example.util.AudioDiagnosticLogger.clearLogs()
+    }
+
+    fun getDiagnosticLogsText(): String {
+        return com.example.util.AudioDiagnosticLogger.getLogsAsFormattedText()
+    }
+
     private val _deviceBatteryIgnored = MutableStateFlow(DeviceStateHelper.isIgnoringBatteryOptimizations(application))
     private val _deviceExactAlarm = MutableStateFlow(DeviceStateHelper.canScheduleExactAlarms(application))
 
@@ -369,6 +379,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         )
+    }
+
+    fun testTriggerReminderNow() {
+        viewModelScope.launch {
+            val prefs = uiState.value.preferences
+            val audios = uiState.value.audios.filter { it.isActive && !it.isMissing }
+            val activeReminders = database.reminderDao().getActiveReminders()
+
+            val audioToPlay = audios.firstOrNull()
+                ?: activeReminders.firstOrNull()?.let { rem ->
+                    AudioItem(
+                        id = rem.id,
+                        uriString = rem.audioUri ?: "tts:${rem.title.replace(" ", "_")}",
+                        label = rem.title,
+                        isActive = true
+                    )
+                }
+
+            if (audioToPlay == null) {
+                _userMessage.emit("Nenhum áudio ou lembrete encontrado para testar.")
+                return@launch
+            }
+
+            if (prefs.vibrateWithAudio) {
+                DeviceStateHelper.triggerVibration(getApplication())
+            }
+
+            com.example.util.ReminderNotificationHelper.showTriggerVisualAlert(
+                context = getApplication(),
+                title = "Lembrete: ${audioToPlay.label}",
+                message = if (audioToPlay.ttsText.isNullOrBlank()) "Reproduzindo áudio nos fones ou alto-falante." else audioToPlay.ttsText,
+                reminderId = audioToPlay.id
+            )
+
+            val volume = (prefs.masterVolumePercent * audioToPlay.volumePercent) / 10000f
+            previewPlayer.playAudio(
+                uriString = audioToPlay.uriString,
+                targetVolume = volume,
+                fadeInDurationMs = 0L,
+                useAppVolumeOnly = prefs.useAppVolumeOnly,
+                audioTitle = audioToPlay.label,
+                ttsText = audioToPlay.ttsText,
+                onComplete = {
+                    viewModelScope.launch {
+                        _userMessage.emit("Reprodução de lembrete concluída!")
+                    }
+                }
+            )
+            _userMessage.emit("Disparando \"${audioToPlay.label}\"! Verifique nos fones ou alto-falante.")
+        }
     }
 
     fun stopPreview() {

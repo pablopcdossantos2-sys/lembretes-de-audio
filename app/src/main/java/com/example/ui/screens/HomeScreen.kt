@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.HourglassBottom
@@ -186,6 +187,24 @@ fun HomeScreen(
                                 }
                             )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    FilledTonalButton(
+                        onClick = { viewModel.testTriggerReminderNow() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("test_reminder_trigger_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Ouvir Disparo de Teste (Fones ou Alto-falante)", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

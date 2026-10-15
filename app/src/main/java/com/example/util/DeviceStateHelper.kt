@@ -57,6 +57,57 @@ object DeviceStateHelper {
         }
     }
 
+    fun isHeadphonesConnected(context: Context): Boolean {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            return devices.any { device ->
+                device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                        device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                        device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                        device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+                        device.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                        device.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                        device.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
+                        device.type == AudioDeviceInfo.TYPE_USB_DEVICE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            return audioManager.isWiredHeadsetOn || audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+        }
+    }
+
+    fun getConnectedAudioDevicesDescription(context: Context): String {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return "Indisponível"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            val names = devices.mapNotNull { device ->
+                when (device.type) {
+                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                    AudioDeviceInfo.TYPE_BLE_HEADSET,
+                    AudioDeviceInfo.TYPE_BLE_SPEAKER -> "Fone Bluetooth (${device.productName.ifBlank { "Sem nome" }})"
+                    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Fone com Fio (P2 / P3)"
+                    AudioDeviceInfo.TYPE_USB_HEADSET,
+                    AudioDeviceInfo.TYPE_USB_DEVICE -> "Fone / Áudio USB"
+                    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Alto-falante Embutido"
+                    else -> null
+                }
+            }.distinct()
+
+            return if (names.isEmpty()) "Alto-falante Padrão do Celular" else names.joinToString(", ")
+        } else {
+            val isHeadset = @Suppress("DEPRECATION") audioManager.isWiredHeadsetOn
+            val isBt = @Suppress("DEPRECATION") (audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn)
+            return when {
+                isBt -> "Fone Bluetooth Conectado"
+                isHeadset -> "Fone com Fio Conectado"
+                else -> "Alto-falante do Celular"
+            }
+        }
+    }
+
     fun isDoNotDisturbActive(context: Context): Boolean {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return false

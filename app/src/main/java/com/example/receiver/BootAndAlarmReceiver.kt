@@ -17,15 +17,47 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
         when (action) {
             AudioReminderService.ACTION_TRIGGER_ALARM -> {
                 // Forward alarm trigger to the foreground service
+                com.example.util.AudioDiagnosticLogger.log(
+                    level = com.example.util.DiagnosticLevel.INFO,
+                    category = com.example.util.DiagnosticCategory.ALARM,
+                    message = "BootAndAlarmReceiver recebeu ACTION_TRIGGER_ALARM",
+                    details = "Encaminhando para AudioReminderService com WakeLock"
+                )
                 try {
+                    val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                    val wakeLock = powerManager?.newWakeLock(
+                        android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                        "AudioReminder:AlarmWakeLock"
+                    )?.apply {
+                        acquire(60_000L) // 60 segundos para garantir que o serviço inicie e toque o áudio
+                    }
+
                     val serviceIntent = Intent(context, AudioReminderService::class.java).apply {
                         this.action = AudioReminderService.ACTION_TRIGGER_ALARM
                         putExtras(intent)
                     }
-                    AudioReminderService.startOrRefresh(context)
-                    context.startService(serviceIntent)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
+                    }
                 } catch (e: Throwable) {
-                    e.printStackTrace()
+                    com.example.util.AudioDiagnosticLogger.log(
+                        level = com.example.util.DiagnosticLevel.WARN,
+                        category = com.example.util.DiagnosticCategory.SERVICE,
+                        message = "Falha ao iniciar AudioReminderService via Receiver: ${e.message}",
+                        details = "Acionando WorkManager como contingência imediata"
+                    )
+                    try {
+                        val oneTime = androidx.work.OneTimeWorkRequestBuilder<com.example.worker.AudioReminderWorker>()
+                            .setInputData(
+                                androidx.work.Data.Builder()
+                                    .putString(com.example.worker.AudioReminderWorker.KEY_TRIGGER_SOURCE, "ALARM_RECEIVER_FALLBACK")
+                                    .build()
+                            )
+                            .build()
+                        androidx.work.WorkManager.getInstance(context).enqueue(oneTime)
+                    } catch (_: Throwable) {}
                 }
             }
 
@@ -36,7 +68,11 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                     val stopPlayerIntent = Intent(context, AudioReminderService::class.java).apply {
                         this.action = AudioReminderService.ACTION_START_OR_REFRESH
                     }
-                    context.startService(stopPlayerIntent)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        context.startForegroundService(stopPlayerIntent)
+                    } else {
+                        context.startService(stopPlayerIntent)
+                    }
                 } catch (e: Throwable) {
                     e.printStackTrace()
                 }
@@ -50,7 +86,11 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                         this.action = AudioReminderService.ACTION_SNOOZE
                         putExtra(AudioReminderService.EXTRA_SNOOZE_MINUTES, 10)
                     }
-                    context.startService(snoozeIntent)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        context.startForegroundService(snoozeIntent)
+                    } else {
+                        context.startService(snoozeIntent)
+                    }
                 } catch (e: Throwable) {
                     e.printStackTrace()
                 }

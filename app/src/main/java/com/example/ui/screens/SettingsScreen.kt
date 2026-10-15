@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -11,6 +13,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.util.AudioDiagnosticLogger
+import com.example.util.DiagnosticCategory
+import com.example.util.DiagnosticLevel
+import com.example.util.DiagnosticLogEntry
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,9 +41,14 @@ import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -157,7 +170,7 @@ fun SettingsScreen(
             Tab(
                 selected = selectedSettingsTab == 0,
                 onClick = { selectedSettingsTab = 0 },
-                text = { Text("Descanso e Não Perturbe") },
+                text = { Text("Descanso") },
                 icon = { Icon(Icons.Default.Bedtime, contentDescription = null) },
                 modifier = Modifier.testTag("tab_quiet_hours")
             )
@@ -168,29 +181,49 @@ fun SettingsScreen(
                 icon = { Icon(Icons.Default.Tune, contentDescription = null) },
                 modifier = Modifier.testTag("tab_general_audio")
             )
+            Tab(
+                selected = selectedSettingsTab == 2,
+                onClick = { selectedSettingsTab = 2 },
+                text = { Text("Diagnósticos") },
+                icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
+                modifier = Modifier.testTag("tab_diagnostics")
+            )
         }
 
-        if (selectedSettingsTab == 0) {
-            // ==========================================
-            // ABA 0: HORÁRIOS DE DESCANSO & NÃO PERTURBE
-            // ==========================================
-            QuietHoursSettingsContent(
-                uiState = uiState,
-                viewModel = viewModel,
-                onOpenStartTimePicker = { showStartTimePicker = true },
-                onOpenEndTimePicker = { showEndTimePicker = true }
-            )
-        } else {
-            // ==========================================
-            // ABA 1: ÁUDIO, BATERIA E BACKUP GERAL
-            // ==========================================
-            GeneralSettingsContent(
-                uiState = uiState,
-                viewModel = viewModel,
-                onOpenBatteryDialog = { showBatteryAssistantDialog = true },
-                onExportBackup = { exportLauncher.launch("lembretes_audio_backup.json") },
-                onImportBackup = { importLauncher.launch(arrayOf("application/json", "*/*")) }
-            )
+        when (selectedSettingsTab) {
+            0 -> {
+                // ==========================================
+                // ABA 0: HORÁRIOS DE DESCANSO & NÃO PERTURBE
+                // ==========================================
+                QuietHoursSettingsContent(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onOpenStartTimePicker = { showStartTimePicker = true },
+                    onOpenEndTimePicker = { showEndTimePicker = true }
+                )
+            }
+            1 -> {
+                // ==========================================
+                // ABA 1: ÁUDIO, BATERIA E BACKUP GERAL
+                // ==========================================
+                GeneralSettingsContent(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onOpenBatteryDialog = { showBatteryAssistantDialog = true },
+                    onExportBackup = { exportLauncher.launch("lembretes_audio_backup.json") },
+                    onImportBackup = { importLauncher.launch(arrayOf("application/json", "*/*")) }
+                )
+            }
+            else -> {
+                // ==========================================
+                // ABA 2: DIAGNÓSTICOS DE ÁUDIO E SERVIÇO
+                // ==========================================
+                DiagnosticsSettingsContent(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onOpenBatteryDialog = { showBatteryAssistantDialog = true }
+                )
+            }
         }
     }
 
@@ -1607,5 +1640,538 @@ fun BatteryAssistantDialog(
             }
         }
     )
+}
+
+@Composable
+fun DiagnosticsSettingsContent(
+    uiState: MainUiState,
+    viewModel: MainViewModel,
+    onOpenBatteryDialog: () -> Unit
+) {
+    val context = LocalContext.current
+    val logs by viewModel.diagnosticLogs.collectAsStateWithLifecycle()
+    var selectedCategoryFilter by remember { mutableStateOf<DiagnosticCategory?>(null) }
+    var selectedLevelFilter by remember { mutableStateOf<DiagnosticLevel?>(null) }
+
+    val filteredLogs = remember(logs, selectedCategoryFilter, selectedLevelFilter) {
+        logs.filter { entry ->
+            (selectedCategoryFilter == null || entry.category == selectedCategoryFilter) &&
+            (selectedLevelFilter == null || entry.level == selectedLevelFilter)
+        }
+    }
+
+    val audioDeviceSummary = remember(logs) {
+        DeviceStateHelper.getConnectedAudioDevicesDescription(context)
+    }
+    val isHeadphones = remember(logs) {
+        DeviceStateHelper.isHeadphonesConnected(context)
+    }
+    val canScheduleExact = remember(logs) {
+        DeviceStateHelper.canScheduleExactAlarms(context)
+    }
+    val isBatteryIgnored = remember(logs) {
+        DeviceStateHelper.isIgnoringBatteryOptimizations(context)
+    }
+    val isDndActive = remember(logs) {
+        DeviceStateHelper.isDoNotDisturbActive(context)
+    }
+    val isCallActive = remember(logs) {
+        DeviceStateHelper.isPhoneCallActive(context)
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .testTag("diagnostics_settings_content"),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // 1. Live Device & Audio Output Status Card
+        item {
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("diagnostics_status_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Status Operacional do Sistema",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (uiState.preferences.isAppMasterEnabled) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                        ) {
+                            Text(
+                                text = if (uiState.preferences.isAppMasterEnabled) "App Ativo" else "App Desligado",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (uiState.preferences.isAppMasterEnabled) Color(0xFF1B5E20) else Color(0xFFB71C1C)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Rota de áudio
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isHeadphones) Icons.Default.Headphones else Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = null,
+                            tint = if (isHeadphones) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Saída de Áudio Atual",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (isHeadphones) "Fones Conectados: $audioDeviceSummary" else "Alto-falante do Celular ($audioDeviceSummary)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+                    // Alarmes exatos
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (canScheduleExact) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (canScheduleExact) Color(0xFF2E7D32) else Color(0xFFED6C02),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Permissão de Alarmes Exatos",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (canScheduleExact) "Autorizado (Disparos no segundo certo)" else "Aproximado (Contingência ativa)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        if (!canScheduleExact && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            TextButton(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                },
+                                modifier = Modifier.testTag("btn_fix_exact_alarm")
+                            ) {
+                                Text("Ajustar", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+                    // Bateria
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.BatteryAlert,
+                                contentDescription = null,
+                                tint = if (isBatteryIgnored) Color(0xFF2E7D32) else Color(0xFFED6C02),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Otimização de Bateria",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (isBatteryIgnored) "Sem Restrições (Em execução contínua)" else "Economia ativada no sistema",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        if (!isBatteryIgnored) {
+                            TextButton(
+                                onClick = onOpenBatteryDialog,
+                                modifier = Modifier.testTag("btn_open_battery_from_diagnostics")
+                            ) {
+                                Text("Resolver", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+
+                    // Avisos adicionais se DND ou chamada
+                    if (isDndActive || isCallActive) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = when {
+                                    isCallActive -> "Atenção: Chamada telefônica detectada no momento (lembretes pausados)."
+                                    else -> "Atenção: Modo Não Perturbe ativo no aparelho."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Action Buttons (Testar Agora, Copiar, Limpar)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Ações de Diagnóstico e Teste",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Button(
+                        onClick = {
+                            viewModel.testTriggerReminderNow()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("btn_test_audio_diagnostics"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Testar Disparo de Áudio Agora (Gera logs em tempo real)", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val text = viewModel.getDiagnosticLogsText()
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                val clip = ClipData.newPlainText("Logs de Diagnóstico", text)
+                                clipboard?.setPrimaryClip(clip)
+                                Toast.makeText(context, "Histórico de logs copiado para a área de transferência!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("btn_copy_diagnostics")
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copiar Logs")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.clearDiagnosticLogs()
+                                Toast.makeText(context, "Logs limpos com sucesso.", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("btn_clear_diagnostics")
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Limpar")
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Category Filter Chips
+        item {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Registros de Eventos (${filteredLogs.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (selectedCategoryFilter != null || selectedLevelFilter != null) {
+                        TextButton(onClick = {
+                            selectedCategoryFilter = null
+                            selectedLevelFilter = null
+                        }) {
+                            Text("Resetar Filtros", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedCategoryFilter == null && selectedLevelFilter == null,
+                        onClick = {
+                            selectedCategoryFilter = null
+                            selectedLevelFilter = null
+                        },
+                        label = { Text("Todos") },
+                        modifier = Modifier.testTag("filter_chip_all")
+                    )
+
+                    FilterChip(
+                        selected = selectedCategoryFilter == DiagnosticCategory.PLAYBACK,
+                        onClick = {
+                            selectedCategoryFilter = if (selectedCategoryFilter == DiagnosticCategory.PLAYBACK) null else DiagnosticCategory.PLAYBACK
+                        },
+                        label = { Text("Reprodução") },
+                        modifier = Modifier.testTag("filter_chip_playback")
+                    )
+
+                    FilterChip(
+                        selected = selectedCategoryFilter == DiagnosticCategory.ROUTING,
+                        onClick = {
+                            selectedCategoryFilter = if (selectedCategoryFilter == DiagnosticCategory.ROUTING) null else DiagnosticCategory.ROUTING
+                        },
+                        label = { Text("Roteamento") },
+                        modifier = Modifier.testTag("filter_chip_routing")
+                    )
+
+                    FilterChip(
+                        selected = selectedCategoryFilter == DiagnosticCategory.ALARM,
+                        onClick = {
+                            selectedCategoryFilter = if (selectedCategoryFilter == DiagnosticCategory.ALARM) null else DiagnosticCategory.ALARM
+                        },
+                        label = { Text("Alarmes") },
+                        modifier = Modifier.testTag("filter_chip_alarm")
+                    )
+
+                    FilterChip(
+                        selected = selectedCategoryFilter == DiagnosticCategory.SERVICE,
+                        onClick = {
+                            selectedCategoryFilter = if (selectedCategoryFilter == DiagnosticCategory.SERVICE) null else DiagnosticCategory.SERVICE
+                        },
+                        label = { Text("Serviço") },
+                        modifier = Modifier.testTag("filter_chip_service")
+                    )
+
+                    FilterChip(
+                        selected = selectedLevelFilter == DiagnosticLevel.ERROR,
+                        onClick = {
+                            selectedLevelFilter = if (selectedLevelFilter == DiagnosticLevel.ERROR) null else DiagnosticLevel.ERROR
+                        },
+                        label = { Text("Erros") },
+                        modifier = Modifier.testTag("filter_chip_errors")
+                    )
+                }
+            }
+        }
+
+        // 4. Log Entries Feed
+        if (filteredLogs.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("empty_diagnostics_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Nenhum evento registrado com o filtro atual.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Toque em 'Testar Disparo de Áudio Agora' acima para executar uma verificação completa e registrar o evento.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
+        } else {
+            items(filteredLogs, key = { it.id }) { logItem ->
+                DiagnosticLogItemCard(entry = logItem)
+            }
+        }
+    }
+}
+
+@Composable
+fun DiagnosticLogItemCard(entry: DiagnosticLogEntry) {
+    val levelColor = when (entry.level) {
+        DiagnosticLevel.SUCCESS -> Color(0xFF2E7D32)
+        DiagnosticLevel.INFO -> MaterialTheme.colorScheme.primary
+        DiagnosticLevel.WARN -> Color(0xFFED6C02)
+        DiagnosticLevel.ERROR -> MaterialTheme.colorScheme.error
+    }
+
+    val levelBgColor = when (entry.level) {
+        DiagnosticLevel.SUCCESS -> Color(0xFFE8F5E9)
+        DiagnosticLevel.INFO -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        DiagnosticLevel.WARN -> Color(0xFFFFF3E0)
+        DiagnosticLevel.ERROR -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+    }
+
+    val levelIcon = when (entry.level) {
+        DiagnosticLevel.SUCCESS -> Icons.Default.CheckCircle
+        DiagnosticLevel.INFO -> Icons.Default.Info
+        DiagnosticLevel.WARN -> Icons.Default.Warning
+        DiagnosticLevel.ERROR -> Icons.Default.Error
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("diagnostic_log_item_${entry.id}"),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = levelBgColor,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = levelIcon,
+                        contentDescription = null,
+                        tint = levelColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = entry.category.name,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Text(
+                        text = entry.formattedTime,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = entry.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                if (!entry.details.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        Text(
+                            text = entry.details,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 

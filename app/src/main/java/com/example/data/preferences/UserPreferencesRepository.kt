@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.map
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
 data class UserPreferences(
-    val isAppMasterEnabled: Boolean = false,
+    val isAppMasterEnabled: Boolean = true,
     val masterVolumePercent: Int = 100,
     val useAppVolumeOnly: Boolean = false,
     val fadeInEnabled: Boolean = true,
@@ -28,7 +28,7 @@ data class UserPreferences(
     val defaultResumePolicy: String = "NEXT_GRID_MARK",
     val snoozeUntilEpochMillis: Long = 0L,
     val lastSequentialIndex: Int = 0,
-    val quietHoursEnabled: Boolean = true,
+    val quietHoursEnabled: Boolean = false,
     val quietHoursStartHour: Int = 22,
     val quietHoursStartMinute: Int = 0,
     val quietHoursEndHour: Int = 7,
@@ -62,7 +62,7 @@ class UserPreferencesRepository(private val context: Context) {
 
     val preferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
-            isAppMasterEnabled = prefs[Keys.APP_MASTER_ENABLED] ?: false,
+            isAppMasterEnabled = prefs[Keys.APP_MASTER_ENABLED] ?: true,
             masterVolumePercent = prefs[Keys.MASTER_VOLUME_PERCENT] ?: 100,
             useAppVolumeOnly = prefs[Keys.USE_APP_VOLUME_ONLY] ?: false,
             fadeInEnabled = prefs[Keys.FADE_IN_ENABLED] ?: true,
@@ -73,7 +73,7 @@ class UserPreferencesRepository(private val context: Context) {
             defaultResumePolicy = prefs[Keys.DEFAULT_RESUME_POLICY] ?: "NEXT_GRID_MARK",
             snoozeUntilEpochMillis = prefs[Keys.SNOOZE_UNTIL_EPOCH_MILLIS] ?: 0L,
             lastSequentialIndex = prefs[Keys.LAST_SEQUENTIAL_INDEX] ?: 0,
-            quietHoursEnabled = prefs[Keys.QUIET_HOURS_ENABLED] ?: true,
+            quietHoursEnabled = prefs[Keys.QUIET_HOURS_ENABLED] ?: false,
             quietHoursStartHour = prefs[Keys.QUIET_HOURS_START_HOUR] ?: 22,
             quietHoursStartMinute = prefs[Keys.QUIET_HOURS_START_MINUTE] ?: 0,
             quietHoursEndHour = prefs[Keys.QUIET_HOURS_END_HOUR] ?: 7,

@@ -44,13 +44,13 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
 
-                val persistentUriString = persistentFile.toURI().toString()
+                val persistentUriString = android.net.Uri.fromFile(persistentFile).toString()
 
                 // Salva na biblioteca de áudios (AudioDao)
                 val audioEntity = AudioItemEntity(
                     uriString = persistentUriString,
                     label = titulo,
-                    weight = 3,
+                    weight = 4,
                     volumePercent = 100,
                     isActive = true,
                     audioType = "AUDIO_FILE",
@@ -73,7 +73,31 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
                 )
                 database.reminderDao().insertReminder(reminderEntity)
 
-                // Atualiza o agendamento em background
+                // Salva perfil de disparo correspondente para integração total com o motor de agendamento (ProfileDao)
+                val profileEntity = com.example.data.db.ProfileEntity(
+                    name = titulo,
+                    isEnabled = true,
+                    priority = 20, // Prioridade alta para prevalecer sobre padrões
+                    daysOfWeekCsv = "1,2,3,4,5,6,7",
+                    startHour = horaInicio,
+                    startMinute = minutoInicio,
+                    endHour = horaFim,
+                    endMinute = minutoFim,
+                    intervalMinutes = periodicidadeMinutos,
+                    playbackOrder = "SPECIFIC",
+                    specificAudioId = audioId,
+                    resumePolicy = "NEXT_GRID_MARK",
+                    fadeInOverrideEnabled = false,
+                    fadeInDurationSeconds = 2.0f
+                )
+                database.profileDao().upsertProfileWithRests(profileEntity, emptyList())
+
+                // Garante que o aplicativo esteja com o botão mestre ativado e o serviço agendando
+                val prefsRepo = com.example.data.preferences.UserPreferencesRepository(app)
+                prefsRepo.setAppMasterEnabled(true)
+
+                // Atualiza o agendamento no serviço em primeiro plano e no WorkManager
+                com.example.service.AudioReminderService.startOrRefresh(app)
                 ReminderWorkScheduler.rescheduleNextReminder(app)
 
                 withContext(Dispatchers.Main) {
