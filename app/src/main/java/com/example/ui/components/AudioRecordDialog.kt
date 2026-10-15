@@ -289,7 +289,7 @@ private fun RecordingActiveDialog(
                                 previewPlayer.stop()
                                 isPreviewPlaying = false
                                 val dir = File(context.filesDir, "recordings").apply { mkdirs() }
-                                val file = File(dir, "gravacao_${System.currentTimeMillis()}.m4a")
+                                val file = File(dir, "gravacao_${System.currentTimeMillis()}.wav")
                                 val started = recorder.startRecording(file)
                                 if (started) {
                                     recordedFile = file

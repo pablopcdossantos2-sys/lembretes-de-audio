@@ -17,7 +17,10 @@ import com.example.domain.model.ScheduledTrigger
 import com.example.domain.scheduler.ScheduleCalculator
 import com.example.player.AudioPlayerManager
 import com.example.service.AudioReminderService
+import com.example.util.AudioTrimmerUtil
 import com.example.util.DeviceStateHelper
+import android.util.Log
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -264,6 +267,74 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             database.audioDao().deleteAudioById(audioId)
             if (uiState.value.preferences.isAppMasterEnabled) {
                 AudioReminderService.startOrRefresh(getApplication())
+            }
+        }
+    }
+
+    fun trimAudioItem(
+        audioItem: AudioItem,
+        startMs: Long,
+        endMs: Long,
+        replaceOriginal: Boolean,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                stopPreview()
+                val context = getApplication<Application>()
+                val uri = Uri.parse(audioItem.uriString)
+                val originalFile = AudioTrimmerUtil.resolveFileFromUri(context, uri)
+
+                val dir = File(context.filesDir, "audio_recordings").apply { mkdirs() }
+                val ext = originalFile?.extension?.ifBlank { "wav" } ?: if (audioItem.uriString.endsWith(".m4a")) "m4a" else "wav"
+                val trimmedFile = File(dir, "trimmed_${System.currentTimeMillis()}.$ext")
+
+                val success = AudioTrimmerUtil.trimAudio(
+                    context = context,
+                    sourceUriString = audioItem.uriString,
+                    startMs = startMs,
+                    endMs = endMs,
+                    outputFile = trimmedFile
+                )
+
+                if (success && trimmedFile.exists() && trimmedFile.length() > 0) {
+                    val newUriString = Uri.fromFile(trimmedFile).toString()
+                    if (replaceOriginal) {
+                        val updated = audioItem.copy(uriString = newUriString)
+                        database.audioDao().updateAudio(AudioItemEntity.fromDomain(updated))
+                        _userMessage.emit("Áudio \"${audioItem.label}\" aparado com sucesso!")
+                    } else {
+                        val newEntity = AudioItemEntity(
+                            uriString = newUriString,
+                            label = "${audioItem.label} (Aparado)",
+                            weight = audioItem.weight,
+                            volumePercent = audioItem.volumePercent,
+                            isActive = true,
+                            audioType = audioItem.audioType.name,
+                            dateAdded = System.currentTimeMillis()
+                        )
+                        database.audioDao().insertAudio(newEntity)
+                        _userMessage.emit("Cópia aparada adicionada à biblioteca!")
+                    }
+
+                    if (uiState.value.preferences.isAppMasterEnabled) {
+                        AudioReminderService.startOrRefresh(getApplication())
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        onSuccess()
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        onError("Não foi possível aparar o arquivo de áudio.")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error in trimAudioItem", e)
+                withContext(Dispatchers.Main) {
+                    onError("Erro ao processar: ${e.localizedMessage ?: "Falha ao cortar áudio"}")
+                }
             }
         }
     }

@@ -52,6 +52,8 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Stop
 import com.example.ui.components.SimpleTimePickerDialog
+import com.example.ui.components.AudioWaveformFrequencyVisualizer
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalTime
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -163,7 +165,12 @@ fun RecordReminderScreen(
     var currentFile by remember { mutableStateOf<File?>(null) }
     var durationMillis by remember { mutableLongStateOf(0L) }
     var amplitudeLevel by remember { mutableFloatStateOf(0f) }
-    val amplitudeHistory = remember { mutableStateListOf<Float>() }
+
+    // Live frequency data, waveform, dB, and peak frequency collected from recorderHelper
+    val frequencyBands by recorderHelper.frequencyData.collectAsStateWithLifecycle()
+    val waveformPoints by recorderHelper.waveformData.collectAsStateWithLifecycle()
+    val decibels by recorderHelper.decibels.collectAsStateWithLifecycle()
+    val peakFrequencyHz by recorderHelper.peakFrequencyHz.collectAsStateWithLifecycle()
 
     // Preview state
     var isPlayingPreview by remember { mutableStateOf(false) }
@@ -195,16 +202,8 @@ fun RecordReminderScreen(
             while (recordingStatus == RecordingStatus.RECORDING) {
                 durationMillis = System.currentTimeMillis() - startTime
                 val rawAmp = recorderHelper.getMaxAmplitude()
-                val normalizedAmp = (rawAmp / 32767f).coerceIn(0.05f, 1f)
-                amplitudeLevel = normalizedAmp
-
-                // Keep last 30 amplitude samples for live visualizer waveform
-                if (amplitudeHistory.size >= 30) {
-                    amplitudeHistory.removeAt(0)
-                }
-                amplitudeHistory.add(normalizedAmp)
-
-                delay(100)
+                amplitudeLevel = (rawAmp / 32767f).coerceIn(0.05f, 1f)
+                delay(60)
             }
         }
     }
@@ -385,17 +384,14 @@ fun RecordReminderScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Real-Time Waveform / Amplitude Visualizer
-                    AudioWaveformVisualizer(
+                    // Real-Time Audio Frequency Spectrum & Waveform Visualizer
+                    AudioWaveformFrequencyVisualizer(
                         status = recordingStatus,
-                        currentAmplitude = amplitudeLevel,
-                        history = amplitudeHistory,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                        frequencyBands = frequencyBands,
+                        waveformPoints = waveformPoints,
+                        decibels = decibels,
+                        peakFrequencyHz = peakFrequencyHz,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -443,7 +439,6 @@ fun RecordReminderScreen(
                                         val file = recorderHelper.createDefaultOutputFile()
                                         currentFile = file
                                         durationMillis = 0L
-                                        amplitudeHistory.clear()
                                         val started = recorderHelper.startRecording(file)
                                         if (started) {
                                             recordingStatus = RecordingStatus.RECORDING
@@ -574,7 +569,6 @@ fun RecordReminderScreen(
                                         currentFile?.delete()
                                         currentFile = null
                                         durationMillis = 0L
-                                        amplitudeHistory.clear()
                                         recordingStatus = RecordingStatus.IDLE
                                     },
                                     modifier = Modifier.testTag("record_restart_button")
@@ -889,58 +883,3 @@ private fun StatusIndicatorBadge(status: RecordingStatus) {
     }
 }
 
-@Composable
-private fun AudioWaveformVisualizer(
-    status: RecordingStatus,
-    currentAmplitude: Float,
-    history: List<Float>,
-    modifier: Modifier = Modifier
-) {
-    val barColor = if (status == RecordingStatus.RECORDING) {
-        MaterialTheme.colorScheme.error
-    } else if (status == RecordingStatus.PAUSED) {
-        MaterialTheme.colorScheme.tertiary
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-
-    Canvas(modifier = modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
-        val width = size.width
-        val height = size.height
-        val totalBars = 28
-        val barSpacing = 4.dp.toPx()
-        val totalSpacing = barSpacing * (totalBars - 1)
-        val barWidth = ((width - totalSpacing) / totalBars).coerceAtLeast(2.dp.toPx())
-
-        // Pad or slice history to match totalBars
-        val bars = ArrayList<Float>(totalBars)
-        val historyOffset = (history.size - totalBars).coerceAtLeast(0)
-        val visibleHistory = history.drop(historyOffset)
-
-        for (i in 0 until totalBars) {
-            val hIndex = i - (totalBars - visibleHistory.size)
-            if (hIndex >= 0 && hIndex < visibleHistory.size) {
-                bars.add(visibleHistory[hIndex])
-            } else {
-                bars.add(0.08f)
-            }
-        }
-
-        bars.forEachIndexed { index, amp ->
-            val barHeight = when (status) {
-                RecordingStatus.RECORDING -> (height * amp).coerceIn(4.dp.toPx(), height)
-                RecordingStatus.PAUSED -> (height * 0.2f)
-                else -> (height * 0.12f)
-            }
-            val left = index * (barWidth + barSpacing)
-            val top = (height - barHeight) / 2f
-
-            drawRoundRect(
-                color = barColor.copy(alpha = if (status == RecordingStatus.PAUSED) 0.5f else 0.85f),
-                topLeft = Offset(left, top),
-                size = Size(barWidth, barHeight),
-                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
-            )
-        }
-    }
-}

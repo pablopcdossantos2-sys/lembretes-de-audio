@@ -26,8 +26,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import com.example.ui.components.AudioTrimmerDialog
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
@@ -91,6 +93,7 @@ fun LibraryScreen(
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var editingAudio by remember { mutableStateOf<AudioItem?>(null) }
+    var audioToTrim by remember { mutableStateOf<AudioItem?>(null) }
     var audioToDelete by remember { mutableStateOf<AudioItem?>(null) }
     var showTtsDialog by remember { mutableStateOf(false) }
 
@@ -317,7 +320,10 @@ fun LibraryScreen(
                             viewModel.updateAudio(audio.copy(isActive = active))
                         },
                         onEdit = { editingAudio = audio },
-                        onDelete = { audioToDelete = audio }
+                        onDelete = { audioToDelete = audio },
+                        onTrim = if (audio.audioType != AudioType.TEXT_TO_SPEECH) {
+                            { audioToTrim = audio }
+                        } else null
                     )
                 }
             }
@@ -395,6 +401,35 @@ fun LibraryScreen(
             onSave = { updated ->
                 viewModel.updateAudio(updated)
                 editingAudio = null
+            },
+            onOpenTrimmer = if (audio.audioType != AudioType.TEXT_TO_SPEECH) {
+                {
+                    val toTrim = audio
+                    editingAudio = null
+                    audioToTrim = toTrim
+                }
+            } else null
+        )
+    }
+
+    // Diálogo de Aparar Áudio (Trimmer)
+    audioToTrim?.let { audio ->
+        AudioTrimmerDialog(
+            audio = audio,
+            onDismiss = { audioToTrim = null },
+            onSaveTrimmed = { startMs, endMs, replaceOriginal ->
+                viewModel.trimAudioItem(
+                    audioItem = audio,
+                    startMs = startMs,
+                    endMs = endMs,
+                    replaceOriginal = replaceOriginal,
+                    onSuccess = {
+                        audioToTrim = null
+                    },
+                    onError = {
+                        // Error message handled via ViewModel shared flow
+                    }
+                )
             }
         )
     }
@@ -448,7 +483,8 @@ fun AudioItemCard(
     onPlayPause: () -> Unit,
     onToggleActive: (Boolean) -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onTrim: (() -> Unit)? = null
 ) {
     ElevatedCard(
         modifier = Modifier
@@ -574,12 +610,25 @@ fun AudioItemCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Barra inferior com botões de Editar e Excluir
+            // Barra inferior com botões de Aparar, Editar e Excluir
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (onTrim != null && audio.audioType != AudioType.TEXT_TO_SPEECH) {
+                    TextButton(
+                        onClick = onTrim,
+                        modifier = Modifier.testTag("trim_audio_btn_${audio.id}")
+                    ) {
+                        Icon(Icons.Default.ContentCut, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Aparar", fontSize = 12.sp)
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+
                 TextButton(
                     onClick = onEdit,
                     modifier = Modifier.testTag("edit_audio_btn_${audio.id}")
@@ -609,7 +658,8 @@ fun AudioItemCard(
 fun EditAudioDialog(
     audio: AudioItem,
     onDismiss: () -> Unit,
-    onSave: (AudioItem) -> Unit
+    onSave: (AudioItem) -> Unit,
+    onOpenTrimmer: (() -> Unit)? = null
 ) {
     var label by remember { mutableStateOf(audio.label) }
     var volumePercent by remember { mutableFloatStateOf(audio.volumePercent.toFloat()) }
@@ -669,6 +719,20 @@ fun EditAudioDialog(
                         valueRange = 1f..5f,
                         steps = 3
                     )
+                }
+
+                if (audio.audioType != AudioType.TEXT_TO_SPEECH && onOpenTrimmer != null) {
+                    OutlinedButton(
+                        onClick = onOpenTrimmer,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("edit_dialog_trim_button"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCut, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Aparar Silêncio / Cortar Áudio", fontSize = 13.sp)
+                    }
                 }
             }
         },

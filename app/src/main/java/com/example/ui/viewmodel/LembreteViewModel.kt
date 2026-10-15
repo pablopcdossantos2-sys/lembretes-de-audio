@@ -32,7 +32,8 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
             try {
                 val app = getApplication<Application>()
                 val audioDir = File(app.filesDir, "audio_recordings").apply { mkdirs() }
-                val persistentFile = File(audioDir, "rec_${System.currentTimeMillis()}.m4a")
+                val extension = arquivoAudio.extension.ifBlank { "wav" }
+                val persistentFile = File(audioDir, "rec_${System.currentTimeMillis()}.$extension")
 
                 // Copia o arquivo temporário para o armazenamento interno permanente do app
                 if (arquivoAudio.exists() && arquivoAudio.absolutePath != persistentFile.absolutePath) {
