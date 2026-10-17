@@ -22,6 +22,15 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE id = :id")
     suspend fun getReminderById(id: Long): ReminderEntity?
 
+    @Query("SELECT * FROM reminders WHERE profileId = :profileId ORDER BY dateCreated DESC")
+    fun getRemindersForProfileFlow(profileId: Long): Flow<List<ReminderEntity>>
+
+    @Query("SELECT * FROM reminders WHERE profileId = :profileId ORDER BY dateCreated DESC")
+    suspend fun getRemindersForProfile(profileId: Long): List<ReminderEntity>
+
+    @Query("SELECT * FROM reminders WHERE profileId = :profileId AND isEnabled = 1")
+    suspend fun getActiveRemindersForProfile(profileId: Long): List<ReminderEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReminder(reminder: ReminderEntity): Long
 
@@ -30,6 +39,9 @@ interface ReminderDao {
 
     @Query("DELETE FROM reminders WHERE id = :id")
     suspend fun deleteReminderById(id: Long)
+
+    @Query("DELETE FROM reminders WHERE profileId = :profileId")
+    suspend fun deleteRemindersForProfile(profileId: Long)
 
     @Query("DELETE FROM reminders")
     suspend fun deleteAllReminders()

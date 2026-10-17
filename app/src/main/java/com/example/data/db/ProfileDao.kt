@@ -23,6 +23,22 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles WHERE id = :id")
     suspend fun getProfileWithRestsById(id: Long): ProfileWithRestingPeriods?
 
+    @Transaction
+    @Query("SELECT * FROM profiles WHERE id = :id")
+    fun getProfileWithRemindersFlow(id: Long): Flow<ProfileWithReminders?>
+
+    @Transaction
+    @Query("SELECT * FROM profiles WHERE id = :id")
+    suspend fun getProfileWithReminders(id: Long): ProfileWithReminders?
+
+    @Transaction
+    @Query("SELECT * FROM profiles ORDER BY priority DESC, id ASC")
+    fun getAllProfilesWithRemindersFlow(): Flow<List<ProfileWithReminders>>
+
+    @Transaction
+    @Query("SELECT * FROM profiles ORDER BY priority DESC, id ASC")
+    suspend fun getAllProfilesWithReminders(): List<ProfileWithReminders>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProfile(profile: ProfileEntity): Long
 

@@ -121,6 +121,116 @@ class AudioReminderWorkerTest {
     }
 
     @Test
+    fun `reminder without rest period executes cleanly and does not trigger rest notification`() = runBlocking {
+        prefsRepo.setAppMasterEnabled(true)
+        prefsRepo.setQuietHours(
+            enabled = false,
+            startHour = 22,
+            startMinute = 0,
+            endHour = 7,
+            endMinute = 0,
+            daysCsv = "1,2,3,4,5,6,7",
+            notifySilently = false
+        )
+
+        val profileId = database.profileDao().insertProfile(
+            ProfileEntity(
+                name = "Perfil Usuario 1",
+                isEnabled = true,
+                priority = 10,
+                daysOfWeekCsv = "1,2,3,4,5,6,7",
+                startHour = 0,
+                startMinute = 0,
+                endHour = 23,
+                endMinute = 59,
+                intervalMinutes = 15
+            )
+        )
+
+        // Salva lembrete com caminho de áudio e periodicidade individual, sem período de descanso
+        val reminderId = database.reminderDao().insertReminder(
+            com.example.data.db.ReminderEntity(
+                profileId = profileId,
+                title = "Lembrete Água Sem Descanso",
+                audioFilePath = "/tmp/fake_rec.wav",
+                audioUri = "tts:beba_agua",
+                intervalMinutes = 15,
+                isEnabled = true,
+                hasRestPeriod = false,
+                startHour = 0,
+                startMinute = 0,
+                endHour = 23,
+                endMinute = 59
+            )
+        )
+
+        val retrieved = database.reminderDao().getReminderById(reminderId)
+        assertNotNull(retrieved)
+        assertEquals(false, retrieved?.hasRestPeriod)
+        assertEquals(profileId, retrieved?.profileId)
+
+        val worker = TestListenableWorkerBuilder<AudioReminderWorker>(context).build()
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+    }
+
+    @Test
+    fun `worker does not trigger alert notification when current time is in active profile resting period`() = runBlocking {
+        prefsRepo.setAppMasterEnabled(true)
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        notificationManager.cancelAll()
+
+        // Perfil ativo com descanso de 24h cobrindo qualquer horário
+        val profileId = database.profileDao().insertProfile(
+            ProfileEntity(
+                name = "Perfil Com Descanso Total",
+                isEnabled = true,
+                priority = 99,
+                daysOfWeekCsv = "1,2,3,4,5,6,7",
+                startHour = 0,
+                startMinute = 0,
+                endHour = 23,
+                endMinute = 59,
+                intervalMinutes = 15
+            )
+        )
+        database.profileDao().insertRestingPeriods(
+            listOf(
+                RestingPeriodEntity(
+                    profileId = profileId,
+                    label = "Descanso Integral",
+                    startHour = 0,
+                    startMinute = 0,
+                    endHour = 23,
+                    endMinute = 59
+                )
+            )
+        )
+
+        database.reminderDao().insertReminder(
+            com.example.data.db.ReminderEntity(
+                profileId = profileId,
+                title = "Lembrete Bloqueado Pelo Descanso",
+                audioUri = "tts:teste_bloqueado",
+                intervalMinutes = 15,
+                isEnabled = true,
+                hasRestPeriod = false
+            )
+        )
+
+        val worker = TestListenableWorkerBuilder<AudioReminderWorker>(context).build()
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+
+        // Nenhum alerta visual de disparo deve ter sido enviado
+        val activeNotifs = notificationManager.activeNotifications
+        val hasTriggerNotification = activeNotifs.any { it.id == com.example.util.ReminderNotificationHelper.NOTIFICATION_ID_TRIGGER_ALERT }
+        assertEquals(false, hasTriggerNotification)
+    }
+
+    @Test
     fun `notification channels are created with IMPORTANCE_HIGH for intrusive alerts`() {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
         com.example.util.ReminderNotificationHelper.ensureNotificationChannel(context)

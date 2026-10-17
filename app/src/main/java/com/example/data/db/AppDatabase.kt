@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
         RestingPeriodEntity::class,
         ReminderEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -85,7 +85,7 @@ abstract class AppDatabase : RoomDatabase() {
         suspend fun populateInitialData(database: AppDatabase) {
             val profileDao = database.profileDao()
 
-                // Perfil Comercial (Segunda a Sexta, 08:00 às 18:00, a cada 15 min com descanso das 12:00 às 13:00)
+                // Perfil Comercial (Segunda a Sexta, 08:00 às 18:00, a cada 15 min - sem descansos forçados)
                 val commercial = ProfileEntity(
                     name = "Horário Comercial",
                     isEnabled = true,
@@ -101,18 +101,9 @@ abstract class AppDatabase : RoomDatabase() {
                     fadeInOverrideEnabled = false,
                     fadeInDurationSeconds = 2.0f
                 )
-                val commercialRests = listOf(
-                    RestingPeriodEntity(
-                        label = "Almoço",
-                        startHour = 12,
-                        startMinute = 0,
-                        endHour = 13,
-                        endMinute = 0
-                    )
-                )
-                profileDao.upsertProfileWithRests(commercial, commercialRests)
+                profileDao.upsertProfileWithRests(commercial, emptyList())
 
-                // Perfil Final de Semana (Sábado e Domingo, 09:00 às 21:00, a cada 30 min com descanso das 13:00 às 14:00)
+                // Perfil Final de Semana (Sábado e Domingo, 09:00 às 21:00, a cada 30 min - sem descansos forçados)
                 val weekend = ProfileEntity(
                     name = "Fim de Semana",
                     isEnabled = true,
@@ -128,16 +119,7 @@ abstract class AppDatabase : RoomDatabase() {
                     fadeInOverrideEnabled = false,
                     fadeInDurationSeconds = 2.0f
                 )
-                val weekendRests = listOf(
-                    RestingPeriodEntity(
-                        label = "Descanso / Almoço",
-                        startHour = 13,
-                        startMinute = 0,
-                        endHour = 14,
-                        endMinute = 0
-                    )
-                )
-                profileDao.upsertProfileWithRests(weekend, weekendRests)
+                profileDao.upsertProfileWithRests(weekend, emptyList())
 
                 // Perfil Rotina Diária (Todos os dias, 07:00 às 23:00, a cada 15 min, garantindo funcionamento contínuo)
                 val daily = ProfileEntity(

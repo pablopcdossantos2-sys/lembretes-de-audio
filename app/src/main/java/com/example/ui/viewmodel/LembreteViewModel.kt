@@ -5,9 +5,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.db.AppDatabase
 import com.example.data.db.AudioItemEntity
+import com.example.data.db.ProfileEntity
+import com.example.data.db.ProfileWithRestingPeriods
 import com.example.data.db.ReminderEntity
 import com.example.worker.ReminderWorkScheduler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -18,14 +23,24 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
 
     private val database = AppDatabase.getDatabase(application)
 
+    val profilesState: StateFlow<List<ProfileWithRestingPeriods>> =
+        database.profileDao().getAllProfilesWithRestsFlow()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+
     fun salvarLembreteGravado(
         titulo: String,
         arquivoAudio: File,
         periodicidadeMinutos: Int,
-        horaInicio: Int,
-        minutoInicio: Int,
-        horaFim: Int,
-        minutoFim: Int,
+        selectedProfileId: Long? = null,
+        hasRestPeriod: Boolean = false,
+        horaInicio: Int = 0,
+        minutoInicio: Int = 0,
+        horaFim: Int = 23,
+        minutoFim: Int = 59,
         onSucesso: () -> Unit
     ) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -58,39 +73,48 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
                 )
                 val audioId = database.audioDao().insertAudio(audioEntity)
 
-                // Salva o lembrete com a janela de horário e descanso configurados (ReminderDao)
+                // Define ou localiza o perfil de usuário associado
+                val targetProfileId: Long = if (selectedProfileId != null && selectedProfileId > 0) {
+                    selectedProfileId
+                } else {
+                    // Cria ou atualiza perfil correspondente
+                    val profileEntity = ProfileEntity(
+                        name = titulo,
+                        isEnabled = true,
+                        priority = 20, // Prioridade alta
+                        daysOfWeekCsv = "1,2,3,4,5,6,7",
+                        startHour = if (hasRestPeriod) horaInicio else 0,
+                        startMinute = if (hasRestPeriod) minutoInicio else 0,
+                        endHour = if (hasRestPeriod) horaFim else 23,
+                        endMinute = if (hasRestPeriod) minutoFim else 59,
+                        intervalMinutes = periodicidadeMinutos,
+                        playbackOrder = "SPECIFIC",
+                        specificAudioId = audioId,
+                        audioIdsCsv = audioId.toString(),
+                        resumePolicy = "NEXT_GRID_MARK",
+                        fadeInOverrideEnabled = false,
+                        fadeInDurationSeconds = 2.0f
+                    )
+                    database.profileDao().upsertProfileWithRests(profileEntity, emptyList())
+                }
+
+                // Salva o lembrete no Room com caminho do arquivo gravado, título, periodicidade e vínculo ao perfil
                 val reminderEntity = ReminderEntity(
+                    profileId = targetProfileId,
                     title = titulo,
                     text = "Lembrete gravado a cada $periodicidadeMinutos minutos",
+                    audioFilePath = persistentFile.absolutePath,
                     audioUri = persistentUriString,
                     intervalMinutes = periodicidadeMinutos,
                     isEnabled = true,
-                    startHour = horaInicio,
-                    startMinute = minutoInicio,
-                    endHour = horaFim,
-                    endMinute = minutoFim,
+                    hasRestPeriod = hasRestPeriod,
+                    startHour = if (hasRestPeriod) horaInicio else 0,
+                    startMinute = if (hasRestPeriod) minutoInicio else 0,
+                    endHour = if (hasRestPeriod) horaFim else 23,
+                    endMinute = if (hasRestPeriod) minutoFim else 59,
                     dateCreated = System.currentTimeMillis()
                 )
                 database.reminderDao().insertReminder(reminderEntity)
-
-                // Salva perfil de disparo correspondente para integração total com o motor de agendamento (ProfileDao)
-                val profileEntity = com.example.data.db.ProfileEntity(
-                    name = titulo,
-                    isEnabled = true,
-                    priority = 20, // Prioridade alta para prevalecer sobre padrões
-                    daysOfWeekCsv = "1,2,3,4,5,6,7",
-                    startHour = horaInicio,
-                    startMinute = minutoInicio,
-                    endHour = horaFim,
-                    endMinute = minutoFim,
-                    intervalMinutes = periodicidadeMinutos,
-                    playbackOrder = "SPECIFIC",
-                    specificAudioId = audioId,
-                    resumePolicy = "NEXT_GRID_MARK",
-                    fadeInOverrideEnabled = false,
-                    fadeInDurationSeconds = 2.0f
-                )
-                database.profileDao().upsertProfileWithRests(profileEntity, emptyList())
 
                 // Garante que o aplicativo esteja com o botão mestre ativado e o serviço agendando
                 val prefsRepo = com.example.data.preferences.UserPreferencesRepository(app)

@@ -48,9 +48,12 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import com.example.ui.components.SimpleTimePickerDialog
 import com.example.ui.components.AudioWaveformFrequencyVisualizer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -176,8 +179,11 @@ fun RecordReminderScreen(
     var isPlayingPreview by remember { mutableStateOf(false) }
 
     // Reminder Metadata form fields
+    val availableProfiles by lembreteViewModel.profilesState.collectAsStateWithLifecycle()
+    var selectedProfileId by remember { mutableStateOf<Long?>(null) }
     var title by remember { mutableStateOf("") }
     var periodicityMinutes by remember { mutableIntStateOf(15) }
+    var hasRestPeriod by remember { mutableStateOf(false) } // Padrão: SEM descanso programado
     var startTime by remember { mutableStateOf(LocalTime.of(8, 0)) }
     var endTime by remember { mutableStateOf(LocalTime.of(22, 0)) }
     var showStartTimePicker by remember { mutableStateOf(false) }
@@ -632,7 +638,7 @@ fun RecordReminderScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Text(
                             text = "Detalhes do Lembrete",
@@ -641,6 +647,44 @@ fun RecordReminderScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
+                        // 1. Vínculo ao Perfil de Usuário
+                        Text(
+                            text = "Perfil de Usuário:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            FilterChip(
+                                selected = selectedProfileId == null,
+                                onClick = { selectedProfileId = null },
+                                label = { Text("Novo Perfil Individual") },
+                                leadingIcon = if (selectedProfileId == null) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                } else null,
+                                modifier = Modifier.testTag("profile_chip_new")
+                            )
+
+                            availableProfiles.forEach { profileWithRests ->
+                                val p = profileWithRests.profile
+                                FilterChip(
+                                    selected = selectedProfileId == p.id,
+                                    onClick = { selectedProfileId = p.id },
+                                    label = { Text(p.name) },
+                                    leadingIcon = if (selectedProfileId == p.id) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else {
+                                        { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    },
+                                    modifier = Modifier.testTag("profile_chip_${p.id}")
+                                )
+                            }
+                        }
+
+                        // 2. Título do Lembrete
                         OutlinedTextField(
                             value = title,
                             onValueChange = { title = it },
@@ -653,6 +697,7 @@ fun RecordReminderScreen(
                             shape = RoundedCornerShape(12.dp)
                         )
 
+                        // 3. Periodicidade Individual
                         Text(
                             text = "Periodicidade:",
                             style = MaterialTheme.typography.bodyMedium,
@@ -680,7 +725,7 @@ fun RecordReminderScreen(
                             }
                         }
 
-                        // Horário de Funcionamento & Horário de Descanso
+                        // 4. Período de Descanso (Opcional - desligado por padrão)
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -691,69 +736,102 @@ fun RecordReminderScreen(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Bedtime,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text(
-                                        text = "Horário de Funcionamento & Descanso",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    OutlinedButton(
-                                        onClick = { showStartTimePicker = true },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("start_time_button"),
-                                        shape = RoundedCornerShape(8.dp)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(String.format(Locale.getDefault(), "Início: %02d:%02d", startTime.hour, startTime.minute))
+                                        Icon(
+                                            imageVector = Icons.Default.Bedtime,
+                                            contentDescription = null,
+                                            tint = if (hasRestPeriod) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "Período de Descanso",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = if (hasRestPeriod) "Descanso programado ativado" else "Sem descanso (ativo 24h contínuo)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
 
-                                    OutlinedButton(
-                                        onClick = { showEndTimePicker = true },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("end_time_button"),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text(String.format(Locale.getDefault(), "Fim: %02d:%02d", endTime.hour, endTime.minute))
-                                    }
+                                    Switch(
+                                        checked = hasRestPeriod,
+                                        onCheckedChange = { hasRestPeriod = it },
+                                        modifier = Modifier.testTag("has_rest_period_switch")
+                                    )
                                 }
 
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = String.format(
-                                            Locale.getDefault(),
-                                            "Horário de Descanso: das %02d:%02d às %02d:%02d (o lembrete NÃO será emitido durante este intervalo para garantir seu repouso).",
-                                            endTime.hour,
-                                            endTime.minute,
-                                            startTime.hour,
-                                            startTime.minute
-                                        ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(8.dp)
-                                    )
+                                if (hasRestPeriod) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = { showStartTimePicker = true },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .testTag("start_time_button"),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text(String.format(Locale.getDefault(), "Início: %02d:%02d", startTime.hour, startTime.minute))
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = { showEndTimePicker = true },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .testTag("end_time_button"),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text(String.format(Locale.getDefault(), "Fim: %02d:%02d", endTime.hour, endTime.minute))
+                                        }
+                                    }
+
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = String.format(
+                                                Locale.getDefault(),
+                                                "Horário Ativo das %02d:%02d às %02d:%02d. O lembrete descansará silenciosamente fora desta janela.",
+                                                startTime.hour,
+                                                startTime.minute,
+                                                endTime.hour,
+                                                endTime.minute
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(8.dp)
+                                        )
+                                    }
+                                } else {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "Sem descanso programado. O lembrete tocará continuamente no intervalo selecionado a qualquer hora do dia ou da noite.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.padding(8.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -770,6 +848,8 @@ fun RecordReminderScreen(
                                     titulo = title.ifBlank { "Lembrete Gravado" },
                                     arquivoAudio = file,
                                     periodicidadeMinutos = periodicityMinutes,
+                                    selectedProfileId = selectedProfileId,
+                                    hasRestPeriod = hasRestPeriod,
                                     horaInicio = startTime.hour,
                                     minutoInicio = startTime.minute,
                                     horaFim = endTime.hour,
@@ -777,7 +857,7 @@ fun RecordReminderScreen(
                                     onSucesso = {
                                         isSaving = false
                                         scope.launch {
-                                            snackbarHostState.showSnackbar("Lembrete e Horário de Descanso salvos com sucesso no Room!")
+                                            snackbarHostState.showSnackbar("Lembrete salvo com sucesso no banco Room!")
                                         }
                                         onNavigateBack()
                                     }

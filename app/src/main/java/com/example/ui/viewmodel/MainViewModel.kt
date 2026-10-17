@@ -404,9 +404,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val audioToPlay = audios.firstOrNull()
                 ?: activeReminders.firstOrNull()?.let { rem ->
+                    val uri = rem.audioFilePath?.takeIf { java.io.File(it).exists() }?.let { "file://$it" }
+                        ?: rem.audioUri
+                        ?: "tts:${rem.title.replace(" ", "_")}"
                     AudioItem(
                         id = rem.id,
-                        uriString = rem.audioUri ?: "tts:${rem.title.replace(" ", "_")}",
+                        uriString = uri,
                         label = rem.title,
                         isActive = true
                     )
