@@ -27,10 +27,19 @@ class AudioReminderApp : Application() {
         UserPreferencesRepository(this)
     }
 
+    val audioPlayerManager: com.example.player.AudioPlayerManager by lazy {
+        com.example.player.AudioPlayerManager(this)
+    }
+
     override fun onCreate() {
         super.onCreate()
         com.example.util.AudioDiagnosticLogger.init(this)
         createNotificationChannels()
+
+        // Pré-inicializa o motor de áudio e sintetizador de voz (TTS) para resposta instantânea
+        try {
+            audioPlayerManager
+        } catch (_: Throwable) {}
 
         // Sincroniza o serviço e o agendamento em background se o aplicativo estiver habilitado
         applicationScope.launch {

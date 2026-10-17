@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -120,6 +121,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var selectedSettingsTab by remember { mutableIntStateOf(0) }
     var showBatteryAssistantDialog by remember { mutableStateOf(showBatteryDialogDefault) }
+    var showExactAlarmDialog by remember { mutableStateOf(false) }
     var importResultDialog by remember { mutableStateOf<ImportResult?>(null) }
 
     // Diálogos de Seleção de Horário de Início e Fim do Descanso
@@ -162,6 +164,68 @@ fun SettingsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Alerta fixo caso a permissão de alarme exato não esteja concedida no Android 12+ (API 31+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !uiState.canScheduleExactAlarms) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("exact_alarm_warning_banner")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Permissão de Alarme Exato Necessária",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                text = "No Android 12+, autorize 'Alarmes e lembretes' para disparos pontuais.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TextButton(
+                            onClick = { showExactAlarmDialog = true },
+                            modifier = Modifier.testTag("btn_banner_exact_alarm_info")
+                        ) {
+                            Text("Ajuda", color = MaterialTheme.colorScheme.onErrorContainer)
+                        }
+                        Button(
+                            onClick = { viewModel.openExactAlarmSettings() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            ),
+                            modifier = Modifier.testTag("request_exact_alarm_permission_button")
+                        ) {
+                            Text("Permitir")
+                        }
+                    }
+                }
+            }
+        }
+
         // Abas principais de navegação nas configurações
         TabRow(
             selectedTabIndex = selectedSettingsTab,
@@ -210,6 +274,7 @@ fun SettingsScreen(
                     uiState = uiState,
                     viewModel = viewModel,
                     onOpenBatteryDialog = { showBatteryAssistantDialog = true },
+                    onOpenExactAlarmDialog = { showExactAlarmDialog = true },
                     onExportBackup = { exportLauncher.launch("lembretes_audio_backup.json") },
                     onImportBackup = { importLauncher.launch(arrayOf("application/json", "*/*")) }
                 )
@@ -221,7 +286,8 @@ fun SettingsScreen(
                 DiagnosticsSettingsContent(
                     uiState = uiState,
                     viewModel = viewModel,
-                    onOpenBatteryDialog = { showBatteryAssistantDialog = true }
+                    onOpenBatteryDialog = { showBatteryAssistantDialog = true },
+                    onOpenExactAlarmDialog = { showExactAlarmDialog = true }
                 )
             }
         }
@@ -290,6 +356,15 @@ fun SettingsScreen(
                     } catch (_: Exception) {}
                 }
             }
+        )
+    }
+
+    // Exact Alarm Permission Dialog (Android 12+)
+    if (showExactAlarmDialog) {
+        ExactAlarmPermissionDialog(
+            canScheduleExact = uiState.canScheduleExactAlarms,
+            onDismiss = { showExactAlarmDialog = false },
+            onRequestPermission = { viewModel.openExactAlarmSettings() }
         )
     }
 
@@ -1015,6 +1090,7 @@ fun GeneralSettingsContent(
     uiState: MainUiState,
     viewModel: MainViewModel,
     onOpenBatteryDialog: () -> Unit,
+    onOpenExactAlarmDialog: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit
 ) {
@@ -1238,7 +1314,76 @@ fun GeneralSettingsContent(
             }
         }
 
-        // 4. Backup e Exportação
+        // 4. Permissão de Alarmes Exatos (Android 12+)
+        item {
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("exact_alarm_settings_card"),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Permissão de Alarmes Exatos (SCHEDULE_EXACT_ALARM)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+
+                    Text(
+                        text = "No Android 12+ (API 31+), o sistema exige autorização expressa do usuário para disparar alarmes no minuto e segundo exatos programados.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("exact_alarm_status_indicator")
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.canScheduleExactAlarms) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (uiState.canScheduleExactAlarms) Color(0xFF2E7D32) else Color(0xFFD32F2F),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (uiState.canScheduleExactAlarms) "Autorizado (Disparos pontuais)" else "Não concedido (Pode atrasar)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (uiState.canScheduleExactAlarms) Color(0xFF1B5E20) else Color(0xFFC62828)
+                            )
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TextButton(
+                                onClick = onOpenExactAlarmDialog,
+                                modifier = Modifier.testTag("exact_alarm_help_button")
+                            ) {
+                                Text("Ajuda")
+                            }
+                            Button(
+                                onClick = { viewModel.openExactAlarmSettings() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (uiState.canScheduleExactAlarms) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                ),
+                                modifier = Modifier.testTag("request_exact_alarm_permission_button")
+                            ) {
+                                Text(if (uiState.canScheduleExactAlarms) "Verificar" else "Conceder")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Backup e Exportação
         item {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1642,11 +1787,116 @@ fun BatteryAssistantDialog(
     )
 }
 
+/**
+ * Diálogo de permissão para SCHEDULE_EXACT_ALARM no Android 12+ (API 31+).
+ * Explica o motivo e orienta o usuário a habilitar 'Alarmes e lembretes'.
+ */
+@Composable
+fun ExactAlarmPermissionDialog(
+    canScheduleExact: Boolean,
+    onDismiss: () -> Unit,
+    onRequestPermission: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("exact_alarm_permission_dialog"),
+        icon = {
+            Icon(
+                imageVector = if (canScheduleExact) Icons.Default.CheckCircle else Icons.Default.Schedule,
+                contentDescription = null,
+                tint = if (canScheduleExact) Color(0xFF2E7D32) else Color(0xFFD32F2F),
+                modifier = Modifier.size(36.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Permissão de Alarmes Exatos",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (canScheduleExact) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (canScheduleExact) Icons.Default.CheckCircle else Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = if (canScheduleExact) Color(0xFF1B5E20) else Color(0xFFC62828),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (canScheduleExact) "Permissão Concedida" else "Ação Recomendada",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (canScheduleExact) Color(0xFF1B5E20) else Color(0xFFC62828)
+                            )
+                            Text(
+                                text = if (canScheduleExact)
+                                    "O app tem permissão para disparar áudios no segundo programado."
+                                else
+                                    "Sem esta permissão, o sistema pode atrasar ou agrupar seus lembretes.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (canScheduleExact) Color(0xFF2E7D32) else Color(0xFFB71C1C)
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = "A partir do Android 12 (API 31+), o sistema exige permissão explícita (SCHEDULE_EXACT_ALARM) para disparos pontuais.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text(
+                    text = "Passos para ativar:\n1. Clique em 'Abrir Configurações' abaixo.\n2. Na tela do sistema, ative 'Permitir definição de alarmes e lembretes'.\n3. Retorne ao app e a verificação será atualizada automaticamente.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onRequestPermission()
+                    onDismiss()
+                },
+                modifier = Modifier.testTag("btn_confirm_exact_alarm_settings")
+            ) {
+                Text(if (canScheduleExact) "Verificar Ajustes" else "Abrir Configurações")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("btn_dismiss_exact_alarm_dialog")
+            ) {
+                Text("Fechar")
+            }
+        }
+    )
+}
+
 @Composable
 fun DiagnosticsSettingsContent(
     uiState: MainUiState,
     viewModel: MainViewModel,
-    onOpenBatteryDialog: () -> Unit
+    onOpenBatteryDialog: () -> Unit,
+    onOpenExactAlarmDialog: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val logs by viewModel.diagnosticLogs.collectAsStateWithLifecycle()

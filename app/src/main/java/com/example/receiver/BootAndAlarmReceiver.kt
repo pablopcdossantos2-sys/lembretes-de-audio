@@ -34,7 +34,7 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.ALARM,
                     message = "BootAndAlarmReceiver recebeu ACTION_TRIGGER_ALARM",
-                    details = "Iniciando processamento prioritário de alarme"
+                    details = "Executando reprodução de áudio prioritária com WakeLock ativo"
                 )
 
                 CoroutineScope(Dispatchers.IO).launch {
@@ -43,39 +43,16 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                         PowerManager.PARTIAL_WAKE_LOCK,
                         "AudioReminder:AlarmWakeLock"
                     )?.apply {
-                        acquire(60_000L)
+                        acquire(120_000L)
                     }
 
                     try {
-                        var serviceStarted = false
-                        try {
-                            val serviceIntent = Intent(context, AudioReminderService::class.java).apply {
-                                this.action = AudioReminderService.ACTION_TRIGGER_ALARM
-                                putExtras(intent)
-                            }
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                context.startForegroundService(serviceIntent)
-                            } else {
-                                context.startService(serviceIntent)
-                            }
-                            serviceStarted = true
-                        } catch (e: Throwable) {
-                            AudioDiagnosticLogger.log(
-                                level = DiagnosticLevel.WARN,
-                                category = DiagnosticCategory.SERVICE,
-                                message = "Início do serviço em 1º plano impedido pelo sistema: ${e.message}",
-                                details = "Ativando reprodução de áudio direta de contingência"
-                            )
-                        }
-
-                        // Se o serviço não pôde ser iniciado diretamente em segundo plano (Android 14+),
-                        // executa a reprodução imediatamente no próprio receptor enquanto mantém o WakeLock
-                        if (!serviceStarted) {
-                            executeDirectPlayback(context, intent)
-                        }
+                        executeDirectPlayback(context, intent)
                     } finally {
                         try {
-                            wakeLock?.release()
+                            if (wakeLock?.isHeld == true) {
+                                wakeLock.release()
+                            }
                         } catch (_: Throwable) {}
                         pendingResult.finish()
                     }
@@ -167,15 +144,72 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
             }
 
             val now = ZonedDateTime.now()
+
+            // 1. Verifica Modo Não Perturbe se configurado
+            if (prefs.respectDoNotDisturb && DeviceStateHelper.isDoNotDisturbActive(context)) {
+                AudioDiagnosticLogger.log(
+                    level = DiagnosticLevel.WARN,
+                    category = DiagnosticCategory.ROUTING,
+                    message = "Disparo silenciado: Modo Não Perturbe ativo"
+                )
+                AudioReminderService.startOrRefresh(context)
+                return
+            }
+
+            // 2. Verifica chamada telefônica em andamento
+            if (DeviceStateHelper.isPhoneCallActive(context)) {
+                AudioDiagnosticLogger.log(
+                    level = DiagnosticLevel.WARN,
+                    category = DiagnosticCategory.ROUTING,
+                    message = "Disparo pausado: Chamada telefônica ativa"
+                )
+                AudioReminderService.startOrRefresh(context)
+                return
+            }
+
             val profiles = database.profileDao().getAllProfilesWithRests().map { it.toDomain() }
             val activeAudios = database.audioDao().getActiveAudios().map { it.toDomain() }
             val activeReminders = database.reminderDao().getActiveReminders()
 
             val activeProfile = ScheduleCalculator.findActiveProfileFor(now, profiles)
-            val selectedAudio = if (activeProfile != null && activeAudios.isNotEmpty()) {
-                activeAudios.firstOrNull { activeProfile.audioIds.contains(it.id) } ?: activeAudios.firstOrNull()
-            } else {
-                activeAudios.firstOrNull()
+
+            // Se estiver em período de descanso configurado no perfil, não toca
+            if (activeProfile != null && activeProfile.restingPeriods.isNotEmpty()) {
+                val mergedRests = ScheduleCalculator.mergeRestingPeriods(activeProfile.restingPeriods)
+                if (ScheduleCalculator.isTimeInRestingPeriod(now.toLocalTime(), mergedRests)) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.INFO,
+                        category = DiagnosticCategory.SERVICE,
+                        message = "Disparo direto ignorado: Horário de descanso do perfil ativo"
+                    )
+                    AudioReminderService.startOrRefresh(context)
+                    return
+                }
+            }
+
+            val eligibleAudios = if (activeProfile != null) {
+                if (activeProfile.audioIds.isNotEmpty()) {
+                    activeAudios.filter { activeProfile.audioIds.contains(it.id) }
+                } else {
+                    activeAudios
+                }
+            } else activeAudios
+
+            val selectedAudio = when {
+                activeProfile?.playbackOrder == com.example.domain.model.PlaybackOrder.SPECIFIC && activeProfile.specificAudioId != null -> {
+                    activeAudios.firstOrNull { it.id == activeProfile.specificAudioId }
+                        ?: eligibleAudios.firstOrNull { it.id == activeProfile.specificAudioId }
+                        ?: eligibleAudios.firstOrNull()
+                }
+                activeProfile?.playbackOrder == com.example.domain.model.PlaybackOrder.RANDOM -> {
+                    ScheduleCalculator.pickWeightedRandomAudio(eligibleAudios)
+                }
+                activeProfile?.playbackOrder == com.example.domain.model.PlaybackOrder.SEQUENTIAL && eligibleAudios.isNotEmpty() -> {
+                    val index = (prefs.lastSequentialIndex % eligibleAudios.size + eligibleAudios.size) % eligibleAudios.size
+                    prefsRepo.incrementSequentialIndex()
+                    eligibleAudios.getOrNull(index) ?: eligibleAudios.firstOrNull()
+                }
+                else -> eligibleAudios.firstOrNull()
             } ?: activeReminders.firstOrNull()?.let { rem ->
                 com.example.domain.model.AudioItem(
                     id = rem.id,
@@ -197,7 +231,8 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                     reminderId = selectedAudio.id
                 )
 
-                val playerManager = AudioPlayerManager(context)
+                val playerManager = (context.applicationContext as? com.example.AudioReminderApp)?.audioPlayerManager
+                    ?: AudioPlayerManager(context)
                 val playbackDone = CompletableDeferred<Unit>()
 
                 withContext(Dispatchers.Main) {

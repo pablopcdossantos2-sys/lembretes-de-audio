@@ -3,13 +3,16 @@ package com.example.util
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.Settings
 import android.telephony.TelephonyManager
 
 object DeviceStateHelper {
@@ -25,6 +28,41 @@ object DeviceStateHelper {
             alarmManager?.canScheduleExactAlarms() ?: true
         } else {
             true
+        }
+    }
+
+    /**
+     * Abre a tela de configurações do sistema para o usuário conceder
+     * a permissão de agendamento de alarmes exatos (SCHEDULE_EXACT_ALARM) no Android 12+ (API 31+).
+     */
+    fun openExactAlarmSettings(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val intent = Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                    Uri.parse("package:${context.packageName}")
+                ).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                try {
+                    val fallbackIntent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(fallbackIntent)
+                } catch (e2: Exception) {
+                    try {
+                        val appDetailsIntent = Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:${context.packageName}")
+                        ).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(appDetailsIntent)
+                    } catch (_: Exception) {}
+                }
+            }
         }
     }
 

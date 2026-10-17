@@ -192,6 +192,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _deviceExactAlarm.value = DeviceStateHelper.canScheduleExactAlarms(getApplication())
     }
 
+    fun openExactAlarmSettings() {
+        DeviceStateHelper.openExactAlarmSettings(getApplication())
+    }
+
     fun toggleAppMaster(enabled: Boolean) {
         viewModelScope.launch {
             if (enabled) {
