@@ -25,6 +25,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun profileDao(): ProfileDao
     abstract fun reminderDao(): ReminderDao
 
+    suspend fun ensureInitialDataSeeded(context: Context? = null) {
+        Companion.ensureInitialDataSeeded(this, context)
+    }
+
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
@@ -49,14 +53,37 @@ abstract class AppDatabase : RoomDatabase() {
                 super.onCreate(db)
                 INSTANCE?.let { database ->
                     CoroutineScope(Dispatchers.IO).launch {
-                        populateInitialData(database)
+                        database.ensureInitialDataSeeded()
                     }
                 }
             }
+        }
 
-            private suspend fun populateInitialData(database: AppDatabase) {
-                // Cria perfis padrão conforme especificação e app original
-                val profileDao = database.profileDao()
+        suspend fun ensureInitialDataSeeded(database: AppDatabase, context: Context? = null) {
+            val profileDao = database.profileDao()
+            val audioDao = database.audioDao()
+            val existingProfiles = profileDao.getAllProfilesWithRests()
+            val existingAudios = audioDao.getAllAudios()
+
+            if (existingProfiles.isEmpty() || existingAudios.isEmpty()) {
+                populateInitialData(database)
+                if (context != null) {
+                    try {
+                        com.example.service.AudioReminderService.startOrRefresh(context)
+                        com.example.worker.ReminderWorkScheduler.rescheduleNextReminder(context)
+                        com.example.util.AudioDiagnosticLogger.log(
+                            level = com.example.util.DiagnosticLevel.INFO,
+                            category = com.example.util.DiagnosticCategory.SERVICE,
+                            message = "Dados padrão do app inicializados com sucesso",
+                            details = "3 perfis e 3 lembretes de áudio configurados"
+                        )
+                    } catch (_: Throwable) {}
+                }
+            }
+        }
+
+        suspend fun populateInitialData(database: AppDatabase) {
+            val profileDao = database.profileDao()
 
                 // Perfil Comercial (Segunda a Sexta, 08:00 às 18:00, a cada 15 min com descanso das 12:00 às 13:00)
                 val commercial = ProfileEntity(
@@ -163,4 +190,4 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
     }
-}
+

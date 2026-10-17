@@ -197,8 +197,8 @@ class AudioReminderService : Service() {
                     profileName = null
                 )
 
-                // 1. Check if missed (> 3 minutes behind expected trigger time)
-                if (expectedMillis > 0 && (nowMillis - expectedMillis) > 180_000L) {
+                // 1. Check if missed (> 15 minutes behind expected trigger time)
+                if (expectedMillis > 0 && (nowMillis - expectedMillis) > 900_000L) {
                     val missedTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(expectedMillis), ZoneId.systemDefault())
                     AudioDiagnosticLogger.log(
                         level = DiagnosticLevel.WARN,
@@ -212,6 +212,13 @@ class AudioReminderService : Service() {
                     )
                     refreshScheduleAndNotification()
                     return@launch
+                } else if (expectedMillis > 0 && (nowMillis - expectedMillis) > 10_000L) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.INFO,
+                        category = DiagnosticCategory.ALARM,
+                        message = "Alarme executado com ${(nowMillis - expectedMillis) / 1000}s de tolerância do sistema",
+                        details = "Disparo mantido para audibilidade garantida"
+                    )
                 }
 
                 // 2. Check if currently snoozed
@@ -319,9 +326,11 @@ class AudioReminderService : Service() {
                 }
 
                 // 7. Select and play audio (executa sempre, com ou sem fone de ouvido)
-                val selectedAudio: AudioItem? = if (activeProfile != null && activeAudios.isNotEmpty()) {
+                val fromProfile = if (activeProfile != null && activeAudios.isNotEmpty()) {
                     selectAudioForPlayback(activeProfile, activeAudios, prefs.lastSequentialIndex)
                 } else null
+
+                val selectedAudio: AudioItem? = fromProfile
                     ?: activeAudios.firstOrNull()
                     ?: activeReminders.firstOrNull()?.let { rem ->
                         AudioItem(

@@ -35,6 +35,8 @@ class AudioReminderApp : Application() {
         // Sincroniza o serviço e o agendamento em background se o aplicativo estiver habilitado
         applicationScope.launch {
             try {
+                // Garante que perfis e áudios padrão existam antes de agendar
+                database.ensureInitialDataSeeded(applicationContext)
                 val prefs = preferencesRepository.preferencesFlow.first()
                 if (prefs.isAppMasterEnabled) {
                     com.example.service.AudioReminderService.startOrRefresh(applicationContext)

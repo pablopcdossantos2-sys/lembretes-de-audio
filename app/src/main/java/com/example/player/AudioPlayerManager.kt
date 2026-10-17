@@ -65,12 +65,21 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             isTtsInitialized = true
             try {
                 val locale = Locale.forLanguageTag("pt-BR")
-                val langResult = textToSpeech?.setLanguage(locale)
+                var langResult = textToSpeech?.setLanguage(locale)
+                if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    val defaultLocale = Locale.getDefault()
+                    val defResult = textToSpeech?.setLanguage(defaultLocale)
+                    if (defResult == TextToSpeech.LANG_MISSING_DATA || defResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        langResult = textToSpeech?.setLanguage(Locale.US)
+                    } else {
+                        langResult = defResult
+                    }
+                }
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.PLAYBACK,
                     message = "Sintetizador TTS inicializado com sucesso",
-                    details = "Idioma pt-BR status: $langResult"
+                    details = "Status de idioma: $langResult"
                 )
                 textToSpeech?.setAudioAttributes(
                     AudioAttributes.Builder()

@@ -78,6 +78,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _deviceBatteryIgnored = MutableStateFlow(DeviceStateHelper.isIgnoringBatteryOptimizations(application))
     private val _deviceExactAlarm = MutableStateFlow(DeviceStateHelper.canScheduleExactAlarms(application))
 
+    init {
+        viewModelScope.launch {
+            database.ensureInitialDataSeeded(application)
+            val prefs = prefsRepo.getPreferences()
+            if (prefs.isAppMasterEnabled) {
+                AudioReminderService.startOrRefresh(application)
+                com.example.worker.ReminderWorkScheduler.rescheduleNextReminder(application)
+            }
+        }
+    }
+
     private val audiosDomainFlow = database.audioDao().getAllAudiosFlow()
         .map { audioEntities ->
             audioEntities.map { entity ->

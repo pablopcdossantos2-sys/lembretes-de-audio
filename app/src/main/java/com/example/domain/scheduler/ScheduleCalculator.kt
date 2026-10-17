@@ -295,9 +295,10 @@ object ScheduleCalculator {
         }
 
         while (triggers.size < count && daysSearched < maxDaysToSearch) {
-            // Find applicable profiles for this date.
-            // Profiles can start on searchDate.
-            for (profile in enabledProfiles.sortedWith(compareByDescending<Profile> { it.priority }.thenByDescending { it.id })) {
+            val candidatesForDay = mutableListOf<ScheduledTrigger>()
+
+            // Encontra todos os disparos candidatos de TODOS os perfis habilitados neste dia
+            for (profile in enabledProfiles) {
                 if (!profile.daysOfWeek.contains(searchDate.dayOfWeek)) {
                     continue
                 }
@@ -313,24 +314,19 @@ object ScheduleCalculator {
                 var currentInstant = startDateTime
                 val stepMinutes = profile.intervalMinutes.toLong().coerceAtLeast(1L)
 
-                while (!currentInstant.isAfter(endDateTime) && triggers.size < count) {
-                    // Check if currentInstant is after effectiveStart (or strictly in the future)
+                while (!currentInstant.isAfter(endDateTime)) {
+                    // Checa se o horário do gatilho é estritamente no futuro em relação ao momento de corte
                     if (currentInstant.isAfter(effectiveStart)) {
-                        // Check if in resting period
                         val time = currentInstant.toLocalTime()
                         val coveringRest = findCoveringRest(time, mergedRests)
 
                         if (coveringRest == null) {
-                            // Valid trigger point!
-                            // Choose audio
                             val (audioId, audioLabel, isRandom) = selectAudioForProfile(
                                 profile = profile,
                                 activeAudios = activeAudios,
                                 seqIndex = currentSeqIndex
                             )
-                            currentSeqIndex++
-
-                            triggers.add(
+                            candidatesForDay.add(
                                 ScheduledTrigger(
                                     triggerTime = currentInstant,
                                     profileId = profile.id,
@@ -340,59 +336,68 @@ object ScheduleCalculator {
                                     isRandomAudio = isRandom
                                 )
                             )
-                        } else {
-                            // In rest period. Depending on resume policy:
-                            if (profile.resumePolicy == ResumePolicy.AT_REST_END) {
-                                // First check rest end time
-                                val restEndInstant = if (coveringRest.crossesMidnight) {
-                                    if (time.isBefore(coveringRest.endTime)) {
-                                        // Ended on this same day
-                                        ZonedDateTime.of(currentInstant.toLocalDate(), coveringRest.endTime, zone)
-                                    } else {
-                                        // Ends on next day
-                                        ZonedDateTime.of(currentInstant.toLocalDate().plusDays(1), coveringRest.endTime, zone)
-                                    }
-                                } else {
+                        } else if (profile.resumePolicy == ResumePolicy.AT_REST_END) {
+                            val restEndInstant = if (coveringRest.crossesMidnight) {
+                                if (time.isBefore(coveringRest.endTime)) {
                                     ZonedDateTime.of(currentInstant.toLocalDate(), coveringRest.endTime, zone)
+                                } else {
+                                    ZonedDateTime.of(currentInstant.toLocalDate().plusDays(1), coveringRest.endTime, zone)
                                 }
+                            } else {
+                                ZonedDateTime.of(currentInstant.toLocalDate(), coveringRest.endTime, zone)
+                            }
 
-                                if (restEndInstant.isAfter(effectiveStart) &&
-                                    !restEndInstant.isAfter(endDateTime) &&
-                                    !isTimeInRestingPeriod(restEndInstant.toLocalTime(), mergedRests) &&
-                                    triggers.none { it.triggerTime == restEndInstant }
-                                ) {
-                                    val (audioId, audioLabel, isRandom) = selectAudioForProfile(
-                                        profile = profile,
-                                        activeAudios = activeAudios,
-                                        seqIndex = currentSeqIndex
+                            if (restEndInstant.isAfter(effectiveStart) &&
+                                !restEndInstant.isAfter(endDateTime) &&
+                                !isTimeInRestingPeriod(restEndInstant.toLocalTime(), mergedRests)
+                            ) {
+                                val (audioId, audioLabel, isRandom) = selectAudioForProfile(
+                                    profile = profile,
+                                    activeAudios = activeAudios,
+                                    seqIndex = currentSeqIndex
+                                )
+                                candidatesForDay.add(
+                                    ScheduledTrigger(
+                                        triggerTime = restEndInstant,
+                                        profileId = profile.id,
+                                        profileName = profile.name,
+                                        predictedAudioId = audioId,
+                                        predictedAudioLabel = audioLabel,
+                                        isRandomAudio = isRandom
                                     )
-                                    currentSeqIndex++
-                                    triggers.add(
-                                        ScheduledTrigger(
-                                            triggerTime = restEndInstant,
-                                            profileId = profile.id,
-                                            profileName = profile.name,
-                                            predictedAudioId = audioId,
-                                            predictedAudioLabel = audioLabel,
-                                            isRandomAudio = isRandom
-                                        )
-                                    )
-                                }
+                                )
                             }
                         }
                     }
 
                     currentInstant = currentInstant.plusMinutes(stepMinutes)
                 }
+            }
 
-                if (triggers.size >= count) break
+            // Desempate de mesmo horário: mantém o gatilho com maior prioridade de perfil
+            val deduplicated = candidatesForDay
+                .groupBy { it.triggerTime }
+                .map { (_, list) ->
+                    list.maxWithOrNull(
+                        compareBy<ScheduledTrigger> { trigger ->
+                            enabledProfiles.firstOrNull { it.id == trigger.profileId }?.priority ?: 0
+                        }.thenByDescending { it.profileId }
+                    )!!
+                }
+                .sortedBy { it.triggerTime }
+
+            for (trig in deduplicated) {
+                if (triggers.size < count) {
+                    triggers.add(trig)
+                    currentSeqIndex++
+                }
             }
 
             searchDate = searchDate.plusDays(1)
             daysSearched++
         }
 
-        // Sort all discovered triggers chronologically and take requested count
+        // Ordena cronologicamente e garante o retorno dos primeiros solicitados
         return triggers.sortedBy { it.triggerTime }.take(count)
     }
 
