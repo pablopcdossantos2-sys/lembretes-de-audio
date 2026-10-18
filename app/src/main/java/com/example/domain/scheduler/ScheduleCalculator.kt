@@ -91,6 +91,10 @@ object ScheduleCalculator {
             val startMin = p.startTime.hour * 60 + p.startTime.minute
             val endMin = p.endTime.hour * 60 + p.endTime.minute
 
+            if (startMin == endMin && p.label != "Descanso total") {
+                continue
+            }
+
             if (p.crossesMidnight) {
                 // From startMin to 1439
                 for (m in startMin until 1440) minutesCovered[m] = true

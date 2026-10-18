@@ -1911,22 +1911,22 @@ fun DiagnosticsSettingsContent(
     }
 
     val audioDeviceSummary = remember(logs) {
-        DeviceStateHelper.getConnectedAudioDevicesDescription(context)
+        try { DeviceStateHelper.getConnectedAudioDevicesDescription(context) } catch (_: Throwable) { "Alto-falante do Celular" }
     }
     val isHeadphones = remember(logs) {
-        DeviceStateHelper.isHeadphonesConnected(context)
+        try { DeviceStateHelper.isHeadphonesConnected(context) } catch (_: Throwable) { false }
     }
     val canScheduleExact = remember(logs) {
-        DeviceStateHelper.canScheduleExactAlarms(context)
+        try { DeviceStateHelper.canScheduleExactAlarms(context) } catch (_: Throwable) { true }
     }
     val isBatteryIgnored = remember(logs) {
-        DeviceStateHelper.isIgnoringBatteryOptimizations(context)
+        try { DeviceStateHelper.isIgnoringBatteryOptimizations(context) } catch (_: Throwable) { true }
     }
     val isDndActive = remember(logs) {
-        DeviceStateHelper.isDoNotDisturbActive(context)
+        try { DeviceStateHelper.isDoNotDisturbActive(context) } catch (_: Throwable) { false }
     }
     val isCallActive = remember(logs) {
-        DeviceStateHelper.isPhoneCallActive(context)
+        try { DeviceStateHelper.isPhoneCallActive(context) } catch (_: Throwable) { false }
     }
 
     LazyColumn(

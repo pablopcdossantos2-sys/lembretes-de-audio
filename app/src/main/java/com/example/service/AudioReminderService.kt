@@ -257,24 +257,37 @@ class AudioReminderService : Service() {
                 var activeProfile = ScheduleCalculator.findActiveProfileFor(now, profiles)
                 if (activeProfile == null && activeReminders.isNotEmpty()) {
                     val reminder = activeReminders.firstOrNull { rem ->
-                        val start = java.time.LocalTime.of(rem.startHour, rem.startMinute)
-                        val end = java.time.LocalTime.of(rem.endHour, rem.endMinute)
+                        if (!rem.hasRestPeriod) return@firstOrNull true
+                        val start = java.time.LocalTime.of(rem.startHour.coerceIn(0, 23), rem.startMinute.coerceIn(0, 59))
+                        val end = java.time.LocalTime.of(rem.endHour.coerceIn(0, 23), rem.endMinute.coerceIn(0, 59))
                         val t = now.toLocalTime()
-                        if (start == end || start.isAfter(end)) {
+                        val isInRest = if (start == end) false else if (start.isAfter(end)) {
                             !t.isBefore(start) || t.isBefore(end)
                         } else {
                             !t.isBefore(start) && t.isBefore(end)
                         }
+                        !isInRest
                     } ?: activeReminders.first()
+
+                    val restPeriods = if (reminder.hasRestPeriod && (reminder.startHour != reminder.endHour || reminder.startMinute != reminder.endMinute)) {
+                        listOf(
+                            RestingPeriod(
+                                label = "Repouso",
+                                startTime = java.time.LocalTime.of(reminder.startHour, reminder.startMinute),
+                                endTime = java.time.LocalTime.of(reminder.endHour, reminder.endMinute)
+                            )
+                        )
+                    } else emptyList()
 
                     activeProfile = Profile(
                         id = reminder.id,
                         name = reminder.title,
                         daysOfWeek = setOf(now.dayOfWeek),
-                        startTime = java.time.LocalTime.of(reminder.startHour, reminder.startMinute),
-                        endTime = java.time.LocalTime.of(reminder.endHour, reminder.endMinute),
+                        startTime = java.time.LocalTime.of(0, 0),
+                        endTime = java.time.LocalTime.of(23, 59),
                         intervalMinutes = reminder.intervalMinutes,
-                        playbackOrder = PlaybackOrder.SPECIFIC
+                        playbackOrder = PlaybackOrder.SPECIFIC,
+                        restingPeriods = restPeriods
                     )
                 }
 

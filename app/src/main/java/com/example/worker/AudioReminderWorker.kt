@@ -214,13 +214,6 @@ class AudioReminderWorker(
                         details = "Nenhuma notificação de disparo será emitida para preservar o descanso."
                     )
 
-                    // Apenas exibe notificação se o usuário ativou o aviso nas configurações de descanso
-                    if (prefs.quietHoursEnabled && prefs.quietHoursNotifySilently) {
-                        showRestNotification(
-                            title = "Descanso Ativo ($restLabel)",
-                            message = "Lembretes silenciados até $restEndStr para garantir seu repouso."
-                        )
-                    }
                     return@withContext Result.success()
                 } else {
                     val allowedLog = String.format(
@@ -281,14 +274,14 @@ class AudioReminderWorker(
         }
 
         // Verifica se o lembrete específico está em seu próprio horário de descanso
-        if (targetReminder != null && !isManualTest) {
+        if (targetReminder != null && targetReminder.hasRestPeriod && !isManualTest) {
             val isInActiveWindow = isTimeInReminderActiveWindow(currentLocalTime, targetReminder)
             Log.d(TAG, "[Lembrete Janela] '${targetReminder.title}' (hasRestPeriod: ${targetReminder.hasRestPeriod}). Ativo agora: $isInActiveWindow")
             if (!isInActiveWindow) {
-                // Fora da janela ativa e com descanso programado:
+                // Fora da janela ativa (dentro do descanso programado):
                 val reminderRestLog = String.format(
                     Locale.getDefault(),
-                    "[BLOQUEADO] Lembrete '%s' está em horário de repouso (janela ativa: %02d:%02d às %02d:%02d).",
+                    "[DESCANSO] Lembrete '%s' está em seu período de repouso programado (%02d:%02d às %02d:%02d).",
                     targetReminder.title,
                     targetReminder.startHour,
                     targetReminder.startMinute,
@@ -299,22 +292,9 @@ class AudioReminderWorker(
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.WORKER,
-                    message = reminderRestLog
+                    message = reminderRestLog,
+                    details = "Lembrete silenciado conforme repouso programado."
                 )
-                if (prefs.quietHoursEnabled && prefs.quietHoursNotifySilently) {
-                    showRestNotification(
-                        title = "Lembrete em Horário de Descanso",
-                        message = String.format(
-                            Locale.getDefault(),
-                            "\"%s\" em repouso (ativo das %02d:%02d às %02d:%02d).",
-                            targetReminder.title,
-                            targetReminder.startHour,
-                            targetReminder.startMinute,
-                            targetReminder.endHour,
-                            targetReminder.endMinute
-                        )
-                    )
-                }
                 return@withContext Result.success()
             }
         }
@@ -415,7 +395,7 @@ class AudioReminderWorker(
      */
     private fun isTimeInReminderActiveWindow(time: LocalTime, reminder: ReminderEntity): Boolean {
         if (!reminder.hasRestPeriod) {
-            return true
+            return true // Sem descanso programado: ativo 24h
         }
 
         val start = LocalTime.of(reminder.startHour.coerceIn(0, 23), reminder.startMinute.coerceIn(0, 59))
@@ -425,13 +405,16 @@ class AudioReminderWorker(
             return true
         }
 
-        return if (start.isAfter(end)) {
-            // Janela que cruza meia-noite (ex: 20:00 às 02:00)
+        val isInRestPeriod = if (start.isAfter(end)) {
+            // Descanso cruza meia-noite (ex: repouso das 22:00 às 07:00)
             !time.isBefore(start) || time.isBefore(end)
         } else {
-            // Janela dentro do mesmo dia (ex: 08:00 às 22:00)
+            // Descanso dentro do mesmo dia (ex: repouso das 12:00 às 13:00)
             !time.isBefore(start) && time.isBefore(end)
         }
+
+        // Se está no repouso, a janela ativa é falsa; fora do repouso, pode tocar normalmente
+        return !isInRestPeriod
     }
 
     private fun showRestNotification(title: String, message: String) {

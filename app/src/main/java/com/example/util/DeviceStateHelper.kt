@@ -67,16 +67,15 @@ object DeviceStateHelper {
     }
 
     fun isPhoneCallActive(context: Context): Boolean {
-        val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-
-        val isModeInCall = audioManager?.mode == AudioManager.MODE_IN_CALL ||
-                audioManager?.mode == AudioManager.MODE_IN_COMMUNICATION
-
-        @Suppress("DEPRECATION")
-        val isCallStateActive = telephonyManager?.callState != TelephonyManager.CALL_STATE_IDLE
-
-        return isModeInCall || isCallStateActive
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            val mode = audioManager?.mode ?: AudioManager.MODE_NORMAL
+            mode == AudioManager.MODE_IN_CALL ||
+                    mode == AudioManager.MODE_IN_COMMUNICATION ||
+                    mode == AudioManager.MODE_RINGTONE
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     fun isBluetoothAudioConnected(context: Context): Boolean {
@@ -147,11 +146,15 @@ object DeviceStateHelper {
     }
 
     fun isDoNotDisturbActive(context: Context): Boolean {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            ?: return false
-        val currentFilter = notificationManager.currentInterruptionFilter
-        return currentFilter != NotificationManager.INTERRUPTION_FILTER_ALL &&
-                currentFilter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        return try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                ?: return false
+            val currentFilter = notificationManager.currentInterruptionFilter
+            currentFilter != NotificationManager.INTERRUPTION_FILTER_ALL &&
+                    currentFilter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     fun triggerVibration(context: Context, durationMs: Long = 400L) {

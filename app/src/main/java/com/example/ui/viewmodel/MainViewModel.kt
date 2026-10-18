@@ -59,7 +59,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val database = app?.database ?: com.example.data.db.AppDatabase.getDatabase(application)
     private val prefsRepo = app?.preferencesRepository ?: com.example.data.preferences.UserPreferencesRepository(application)
     private val backupManager = BackupManager(application, database, prefsRepo)
-    private val previewPlayer = AudioPlayerManager(application)
+    private val previewPlayer = app?.audioPlayerManager ?: AudioPlayerManager(application)
 
     private val _previewingAudioId = MutableStateFlow<Long?>(null)
     private val _userMessage = MutableSharedFlow<String>()

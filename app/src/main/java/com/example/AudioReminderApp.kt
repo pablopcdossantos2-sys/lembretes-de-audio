@@ -36,8 +36,9 @@ class AudioReminderApp : Application() {
         com.example.util.AudioDiagnosticLogger.init(this)
         createNotificationChannels()
 
-        // Pré-inicializa o motor de áudio e sintetizador de voz (TTS) para resposta instantânea
+        // Pré-inicializa os arquivos de som locais e motor de áudio
         try {
+            com.example.util.AudioSampleGenerator.ensureDefaultAudioFiles(this)
             audioPlayerManager
         } catch (_: Throwable) {}
 

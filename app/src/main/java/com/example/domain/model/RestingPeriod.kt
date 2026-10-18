@@ -9,9 +9,10 @@ data class RestingPeriod(
     val endTime: LocalTime
 ) {
     val crossesMidnight: Boolean
-        get() = startTime.isAfter(endTime) || startTime == endTime
+        get() = startTime.isAfter(endTime)
 
     fun contains(time: LocalTime): Boolean {
+        if (startTime == endTime) return false
         return if (crossesMidnight) {
             !time.isBefore(startTime) || time.isBefore(endTime)
         } else {

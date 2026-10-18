@@ -77,16 +77,16 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
                 val targetProfileId: Long = if (selectedProfileId != null && selectedProfileId > 0) {
                     selectedProfileId
                 } else {
-                    // Cria ou atualiza perfil correspondente
+                    // Cria perfil com horário contínuo de 24h e descanso dedicado se configurado
                     val profileEntity = ProfileEntity(
                         name = titulo,
                         isEnabled = true,
                         priority = 20, // Prioridade alta
                         daysOfWeekCsv = "1,2,3,4,5,6,7",
-                        startHour = if (hasRestPeriod) horaInicio else 0,
-                        startMinute = if (hasRestPeriod) minutoInicio else 0,
-                        endHour = if (hasRestPeriod) horaFim else 23,
-                        endMinute = if (hasRestPeriod) minutoFim else 59,
+                        startHour = 0,
+                        startMinute = 0,
+                        endHour = 23,
+                        endMinute = 59,
                         intervalMinutes = periodicidadeMinutos,
                         playbackOrder = "SPECIFIC",
                         specificAudioId = audioId,
@@ -95,7 +95,18 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
                         fadeInOverrideEnabled = false,
                         fadeInDurationSeconds = 2.0f
                     )
-                    database.profileDao().upsertProfileWithRests(profileEntity, emptyList())
+                    val profileRests = if (hasRestPeriod && (horaInicio != horaFim || minutoInicio != minutoFim)) {
+                        listOf(
+                            com.example.data.db.RestingPeriodEntity(
+                                label = "Descanso",
+                                startHour = horaInicio,
+                                startMinute = minutoInicio,
+                                endHour = horaFim,
+                                endMinute = minutoFim
+                            )
+                        )
+                    } else emptyList()
+                    database.profileDao().upsertProfileWithRests(profileEntity, profileRests)
                 }
 
                 // Salva o lembrete no Room com caminho do arquivo gravado, título, periodicidade e vínculo ao perfil

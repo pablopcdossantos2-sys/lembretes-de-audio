@@ -184,8 +184,8 @@ fun RecordReminderScreen(
     var title by remember { mutableStateOf("") }
     var periodicityMinutes by remember { mutableIntStateOf(15) }
     var hasRestPeriod by remember { mutableStateOf(false) } // Padrão: SEM descanso programado
-    var startTime by remember { mutableStateOf(LocalTime.of(8, 0)) }
-    var endTime by remember { mutableStateOf(LocalTime.of(22, 0)) }
+    var startTime by remember { mutableStateOf(LocalTime.of(22, 0)) } // Início do repouso noturno (22h)
+    var endTime by remember { mutableStateOf(LocalTime.of(7, 0)) } // Fim do repouso (07h)
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
@@ -756,12 +756,12 @@ fun RecordReminderScreen(
                                         )
                                         Column {
                                             Text(
-                                                text = "Período de Descanso",
+                                                text = "Período de Descanso (Silêncio)",
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = if (hasRestPeriod) "Descanso programado ativado" else "Sem descanso (ativo 24h contínuo)",
+                                                text = if (hasRestPeriod) "Silenciar em horário específico (ex: sono)" else "Sem descanso (tocar 24h contínuo)",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -788,7 +788,7 @@ fun RecordReminderScreen(
                                                 .testTag("start_time_button"),
                                             shape = RoundedCornerShape(8.dp)
                                         ) {
-                                            Text(String.format(Locale.getDefault(), "Início: %02d:%02d", startTime.hour, startTime.minute))
+                                            Text(String.format(Locale.getDefault(), "Dormir: %02d:%02d", startTime.hour, startTime.minute))
                                         }
 
                                         OutlinedButton(
@@ -798,7 +798,7 @@ fun RecordReminderScreen(
                                                 .testTag("end_time_button"),
                                             shape = RoundedCornerShape(8.dp)
                                         ) {
-                                            Text(String.format(Locale.getDefault(), "Fim: %02d:%02d", endTime.hour, endTime.minute))
+                                            Text(String.format(Locale.getDefault(), "Acordar: %02d:%02d", endTime.hour, endTime.minute))
                                         }
                                     }
 
@@ -809,11 +809,12 @@ fun RecordReminderScreen(
                                         Text(
                                             text = String.format(
                                                 Locale.getDefault(),
-                                                "Horário Ativo das %02d:%02d às %02d:%02d. O lembrete descansará silenciosamente fora desta janela.",
+                                                "Silenciado para repouso das %02d:%02d às %02d:%02d. O lembrete tocará nos demais horários do dia a cada %d min.",
                                                 startTime.hour,
                                                 startTime.minute,
                                                 endTime.hour,
-                                                endTime.minute
+                                                endTime.minute,
+                                                periodicityMinutes
                                             ),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -882,7 +883,7 @@ fun RecordReminderScreen(
 
     if (showStartTimePicker) {
         SimpleTimePickerDialog(
-            title = "Início do Funcionamento",
+            title = "Horário de Início do Repouso / Silêncio",
             initialTime = startTime,
             onConfirm = {
                 startTime = it
@@ -894,7 +895,7 @@ fun RecordReminderScreen(
 
     if (showEndTimePicker) {
         SimpleTimePickerDialog(
-            title = "Fim do Funcionamento (Início do Descanso)",
+            title = "Horário de Término do Repouso (Retomar Áudios)",
             initialTime = endTime,
             onConfirm = {
                 endTime = it
