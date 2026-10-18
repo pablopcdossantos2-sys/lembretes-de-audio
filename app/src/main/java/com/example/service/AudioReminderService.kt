@@ -12,6 +12,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.example.AudioReminderApp
 import com.example.MainActivity
 import com.example.R
 import com.example.data.db.AppDatabase
@@ -96,7 +97,7 @@ class AudioReminderService : Service() {
         super.onCreate()
         database = AppDatabase.getDatabase(this)
         preferencesRepo = UserPreferencesRepository(this)
-        playerManager = AudioPlayerManager(this)
+        playerManager = (application as? AudioReminderApp)?.audioPlayerManager ?: AudioPlayerManager(this)
         createNotificationChannels()
     }
 
@@ -339,6 +340,29 @@ class AudioReminderService : Service() {
                     return@launch
                 }
 
+                // 6.1 Check Quiet Hours (Horário Silencioso Global)
+                if (prefs.quietHoursEnabled) {
+                    val inQuietHours = ScheduleCalculator.isTimeInQuietHours(
+                        time = now.toLocalTime(),
+                        dayOfWeek = now.dayOfWeek,
+                        enabled = prefs.quietHoursEnabled,
+                        startHour = prefs.quietHoursStartHour,
+                        startMinute = prefs.quietHoursStartMinute,
+                        endHour = prefs.quietHoursEndHour,
+                        endMinute = prefs.quietHoursEndMinute,
+                        daysOfWeekCsv = prefs.quietHoursDaysCsv
+                    )
+                    if (inQuietHours) {
+                        AudioDiagnosticLogger.log(
+                            level = DiagnosticLevel.INFO,
+                            category = DiagnosticCategory.SERVICE,
+                            message = "Disparo silenciado: Horário Silencioso / Descanso ativo"
+                        )
+                        refreshScheduleAndNotification()
+                        return@launch
+                    }
+                }
+
                 // 7. Select and play audio (executa sempre, com ou sem fone de ouvido)
                 val fromProfile = if (activeProfile != null && activeAudios.isNotEmpty()) {
                     selectAudioForPlayback(activeProfile, activeAudios, prefs.lastSequentialIndex)
@@ -470,6 +494,35 @@ class AudioReminderService : Service() {
         val nowMillis = System.currentTimeMillis()
         val profiles = database.profileDao().getAllProfilesWithRests().map { it.toDomain() }
         val activeAudios = database.audioDao().getActiveAudios().map { it.toDomain() }
+        val activeReminders = database.reminderDao().getActiveReminders()
+
+        val effectiveProfiles = if (profiles.none { it.isEnabled } && activeReminders.isNotEmpty()) {
+            activeReminders.map { rem ->
+                Profile(
+                    id = rem.id,
+                    name = rem.title,
+                    isEnabled = true,
+                    priority = 20,
+                    daysOfWeek = java.time.DayOfWeek.values().toSet(),
+                    startTime = java.time.LocalTime.of(0, 0),
+                    endTime = java.time.LocalTime.of(23, 59),
+                    intervalMinutes = rem.intervalMinutes,
+                    playbackOrder = PlaybackOrder.SPECIFIC,
+                    specificAudioId = rem.id
+                )
+            }
+        } else profiles
+
+        val effectiveAudios = if (activeAudios.isEmpty() && activeReminders.isNotEmpty()) {
+            activeReminders.map { rem ->
+                AudioItem(
+                    id = rem.id,
+                    uriString = rem.audioFilePath?.takeIf { java.io.File(it).exists() }?.let { "file://$it" } ?: rem.audioUri ?: "tts:${rem.title}",
+                    label = rem.title,
+                    isActive = true
+                )
+            }
+        } else activeAudios
 
         val snoozeUntilZoned = if (prefs.snoozeUntilEpochMillis > nowMillis) {
             ZonedDateTime.ofInstant(Instant.ofEpochMilli(prefs.snoozeUntilEpochMillis), ZoneId.systemDefault())
@@ -477,10 +530,16 @@ class AudioReminderService : Service() {
 
         val nextTrigger = ScheduleCalculator.getNextTrigger(
             now = now,
-            profiles = profiles,
-            activeAudios = activeAudios,
+            profiles = effectiveProfiles,
+            activeAudios = effectiveAudios,
             snoozeUntil = snoozeUntilZoned,
-            lastSequentialIndex = prefs.lastSequentialIndex
+            lastSequentialIndex = prefs.lastSequentialIndex,
+            quietHoursEnabled = prefs.quietHoursEnabled,
+            quietHoursStartHour = prefs.quietHoursStartHour,
+            quietHoursStartMinute = prefs.quietHoursStartMinute,
+            quietHoursEndHour = prefs.quietHoursEndHour,
+            quietHoursEndMinute = prefs.quietHoursEndMinute,
+            quietHoursDaysCsv = prefs.quietHoursDaysCsv
         )
 
         val isSnoozed = snoozeUntilZoned != null
@@ -619,10 +678,6 @@ class AudioReminderService : Service() {
                 )
             }
         }
-
-        // Agenda backup via WorkManager com delay correspondente
-        val delayMs = (triggerMillis - System.currentTimeMillis()).coerceAtLeast(0L)
-        com.example.worker.ReminderWorkScheduler.scheduleOneTimeReminderWork(this, delayMs)
     }
 
     private fun cancelExistingAlarm() {

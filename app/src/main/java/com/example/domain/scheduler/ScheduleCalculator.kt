@@ -50,14 +50,29 @@ object ScheduleCalculator {
     ): Boolean {
         if (!enabled) return false
         val selectedDays = parseDaysOfWeek(daysOfWeekCsv)
-        if (!selectedDays.contains(dayOfWeek)) return false
+        if (selectedDays.isEmpty()) return false
 
-        val period = RestingPeriod(
-            label = "Horário de Descanso / Não Perturbe",
-            startTime = LocalTime.of(startHour.coerceIn(0, 23), startMinute.coerceIn(0, 59)),
-            endTime = LocalTime.of(endHour.coerceIn(0, 23), endMinute.coerceIn(0, 59))
-        )
-        return period.contains(time)
+        val start = LocalTime.of(startHour.coerceIn(0, 23), startMinute.coerceIn(0, 59))
+        val end = LocalTime.of(endHour.coerceIn(0, 23), endMinute.coerceIn(0, 59))
+        if (start == end) return false
+
+        val crossesMidnight = start.isAfter(end)
+        return if (crossesMidnight) {
+            // Se cruzou a meia-noite:
+            // 1) Antes da meia-noite (>= start): o dia atual deve estar em selectedDays
+            if (!time.isBefore(start) && selectedDays.contains(dayOfWeek)) {
+                true
+            }
+            // 2) Após a meia-noite (< end): o dia anterior deve estar em selectedDays (Fix M9)
+            else if (time.isBefore(end)) {
+                val yesterday = dayOfWeek.minus(1)
+                selectedDays.contains(yesterday)
+            } else {
+                false
+            }
+        } else {
+            selectedDays.contains(dayOfWeek) && !time.isBefore(start) && time.isBefore(end)
+        }
     }
 
     /**
@@ -91,7 +106,12 @@ object ScheduleCalculator {
             val startMin = p.startTime.hour * 60 + p.startTime.minute
             val endMin = p.endTime.hour * 60 + p.endTime.minute
 
-            if (startMin == endMin && p.label != "Descanso total") {
+            val isFullDayRest = (startMin == endMin && (p.startTime == LocalTime.of(0, 0) || p.label.contains("total", ignoreCase = true)))
+            if (startMin == endMin && !isFullDayRest) {
+                continue
+            }
+            if (isFullDayRest) {
+                for (m in 0 until 1440) minutesCovered[m] = true
                 continue
             }
 
@@ -254,7 +274,13 @@ object ScheduleCalculator {
         profiles: List<Profile>,
         activeAudios: List<AudioItem>,
         snoozeUntil: ZonedDateTime? = null,
-        lastSequentialIndex: Int = 0
+        lastSequentialIndex: Int = 0,
+        quietHoursEnabled: Boolean = false,
+        quietHoursStartHour: Int = 22,
+        quietHoursStartMinute: Int = 0,
+        quietHoursEndHour: Int = 7,
+        quietHoursEndMinute: Int = 0,
+        quietHoursDaysCsv: String = "1,2,3,4,5,6,7"
     ): ScheduledTrigger? {
         val triggers = getNextNTriggers(
             now = now,
@@ -262,7 +288,13 @@ object ScheduleCalculator {
             profiles = profiles,
             activeAudios = activeAudios,
             snoozeUntil = snoozeUntil,
-            lastSequentialIndex = lastSequentialIndex
+            lastSequentialIndex = lastSequentialIndex,
+            quietHoursEnabled = quietHoursEnabled,
+            quietHoursStartHour = quietHoursStartHour,
+            quietHoursStartMinute = quietHoursStartMinute,
+            quietHoursEndHour = quietHoursEndHour,
+            quietHoursEndMinute = quietHoursEndMinute,
+            quietHoursDaysCsv = quietHoursDaysCsv
         )
         return triggers.firstOrNull()
     }
@@ -277,7 +309,13 @@ object ScheduleCalculator {
         profiles: List<Profile>,
         activeAudios: List<AudioItem>,
         snoozeUntil: ZonedDateTime? = null,
-        lastSequentialIndex: Int = 0
+        lastSequentialIndex: Int = 0,
+        quietHoursEnabled: Boolean = false,
+        quietHoursStartHour: Int = 22,
+        quietHoursStartMinute: Int = 0,
+        quietHoursEndHour: Int = 7,
+        quietHoursEndMinute: Int = 0,
+        quietHoursDaysCsv: String = "1,2,3,4,5,6,7"
     ): List<ScheduledTrigger> {
         val enabledProfiles = profiles.filter { it.isEnabled }
         if (enabledProfiles.isEmpty() || activeAudios.isEmpty()) {
@@ -319,12 +357,26 @@ object ScheduleCalculator {
                 val stepMinutes = profile.intervalMinutes.toLong().coerceAtLeast(1L)
 
                 while (!currentInstant.isAfter(endDateTime)) {
-                    // Checa se o horário do gatilho é estritamente no futuro em relação ao momento de corte
-                    if (currentInstant.isAfter(effectiveStart)) {
+                    // Fix A3: Apenas o perfil vencedor para este horário específico pode gerar o disparo
+                    val winningProfile = findActiveProfileFor(currentInstant, enabledProfiles)
+                    if (winningProfile?.id == profile.id && currentInstant.isAfter(effectiveStart)) {
                         val time = currentInstant.toLocalTime()
+
+                        // Fix A4: Checa se está no Horário Silencioso Global
+                        val isQuiet = isTimeInQuietHours(
+                            time = time,
+                            dayOfWeek = currentInstant.dayOfWeek,
+                            enabled = quietHoursEnabled,
+                            startHour = quietHoursStartHour,
+                            startMinute = quietHoursStartMinute,
+                            endHour = quietHoursEndHour,
+                            endMinute = quietHoursEndMinute,
+                            daysOfWeekCsv = quietHoursDaysCsv
+                        )
+
                         val coveringRest = findCoveringRest(time, mergedRests)
 
-                        if (coveringRest == null) {
+                        if (!isQuiet && coveringRest == null) {
                             val (audioId, audioLabel, isRandom) = selectAudioForProfile(
                                 profile = profile,
                                 activeAudios = activeAudios,
@@ -340,7 +392,7 @@ object ScheduleCalculator {
                                     isRandomAudio = isRandom
                                 )
                             )
-                        } else if (profile.resumePolicy == ResumePolicy.AT_REST_END) {
+                        } else if (!isQuiet && profile.resumePolicy == ResumePolicy.AT_REST_END && coveringRest != null) {
                             val restEndInstant = if (coveringRest.crossesMidnight) {
                                 if (time.isBefore(coveringRest.endTime)) {
                                     ZonedDateTime.of(currentInstant.toLocalDate(), coveringRest.endTime, zone)

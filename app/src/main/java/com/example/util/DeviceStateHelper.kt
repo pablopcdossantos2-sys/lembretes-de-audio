@@ -143,11 +143,13 @@ object DeviceStateHelper {
         return try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return "Alto-falante do Celular"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: emptyArray()
+                val devices = try { audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) } catch (_: Throwable) { null } ?: emptyArray()
                 val names = devices.mapNotNull { device ->
+                    if (device == null) return@mapNotNull null
                     val rawName = try { device.productName?.toString()?.trim() } catch (_: Throwable) { null }
                     val label = if (!rawName.isNullOrBlank()) rawName else "Sem nome"
-                    when (device.type) {
+                    val devType = try { device.type } catch (_: Throwable) { -1 }
+                    when (devType) {
                         AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
                         AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
                         TYPE_BLE_HEADSET_VAL,

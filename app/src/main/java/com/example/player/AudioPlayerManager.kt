@@ -122,7 +122,13 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             val minAudibleVol = (maxVol * 0.70f).toInt().coerceAtLeast(1)
             val desiredVol = (maxVol * volumeFraction).toInt().coerceIn(minAudibleVol, maxVol)
 
-            if (!useAppVolumeOnly && (currentVol < desiredVol || currentVol == 0)) {
+            val shouldAdjust = if (useAppVolumeOnly) {
+                currentVol == 0 // Se estiver mudo no aparelho, força volume mínimo para permitir ouvir
+            } else {
+                currentVol < desiredVol || currentVol == 0
+            }
+
+            if (shouldAdjust) {
                 if (previousMusicVolume == null) {
                     previousMusicVolume = currentVol
                 }
@@ -258,13 +264,19 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                     file = matchingChime,
                     audioTitle = audioTitle,
                     clampedTargetVolume = clampedTargetVolume,
-                    fadeInDurationMs = fadeInDurationMs,
+                    fadeInDurationMs = 0L,
                     isChimeBeforeTts = true,
                     onComplete = {
-                        val textToSpeak = when {
+                        val rawText = when {
                             !ttsText.isNullOrBlank() -> ttsText
-                            else -> uriString.removePrefix("tts:").replace("_", " ")
+                            uriString.startsWith("tts:") -> uriString.removePrefix("tts:").replace("_", " ")
+                            audioTitle.isNotBlank() -> audioTitle
+                            else -> "Lembrete em áudio"
                         }
+                        val textToSpeak = if (rawText.startsWith("/") || rawText.contains(".wav") || rawText.contains(".m4a")) {
+                            audioTitle.ifBlank { "Lembrete programado" }
+                        } else rawText
+
                         if (textToSpeak.isNotBlank()) {
                             speakTts(
                                 text = textToSpeak,
@@ -378,10 +390,20 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
 
             mediaPlayer = player
 
-            if (fadeInDurationMs > 100) {
-                player.setVolume(0f, 0f)
+            val duration = try { player.duration } catch (_: Exception) { -1 }
+            val effectiveFadeMs = if (duration in 1..4000) {
+                (duration * 0.15f).toLong().coerceAtMost(fadeInDurationMs)
+            } else if (duration > 4000) {
+                fadeInDurationMs.coerceAtMost(2500L)
+            } else {
+                0L
+            }
+
+            if (effectiveFadeMs > 150) {
+                val initialVol = (clampedTargetVolume * 0.4f)
+                player.setVolume(initialVol, initialVol)
                 player.start()
-                startFadeIn(player, clampedTargetVolume, fadeInDurationMs)
+                startFadeIn(player, clampedTargetVolume, effectiveFadeMs, initialVol)
             } else {
                 player.setVolume(clampedTargetVolume, clampedTargetVolume)
                 player.start()
@@ -599,15 +621,21 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
         }
     }
 
-    private fun startFadeIn(player: MediaPlayer, targetVolume: Float, durationMs: Long) {
+    private fun startFadeIn(
+        player: MediaPlayer,
+        targetVolume: Float,
+        durationMs: Long,
+        startVolume: Float = 0f
+    ) {
         currentFadeJob?.cancel()
         currentFadeJob = scope.launch {
-            val steps = 20
-            val stepDelay = durationMs / steps
+            val steps = 15
+            val stepDelay = (durationMs / steps).coerceAtLeast(15L)
             for (i in 1..steps) {
                 delay(stepDelay)
                 if (mediaPlayer == player && player.isPlaying) {
-                    val currentVol = (targetVolume * i) / steps
+                    val progress = i.toFloat() / steps
+                    val currentVol = startVolume + (targetVolume - startVolume) * progress
                     player.setVolume(currentVol, currentVol)
                 } else {
                     break
