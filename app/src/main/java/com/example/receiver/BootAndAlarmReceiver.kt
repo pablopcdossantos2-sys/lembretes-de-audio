@@ -211,11 +211,15 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                 }
                 else -> eligibleAudios.firstOrNull()
             } ?: activeReminders.firstOrNull()?.let { rem ->
+                val uri = rem.audioFilePath?.takeIf { java.io.File(it).exists() }?.let { "file://$it" }
+                    ?: rem.audioUri
+                    ?: "tts:${rem.title.replace(" ", "_")}"
                 com.example.domain.model.AudioItem(
                     id = rem.id,
-                    uriString = rem.audioUri ?: "tts:${rem.title.replace(" ", "_")}",
+                    uriString = uri,
                     label = rem.title,
-                    isActive = true
+                    isActive = true,
+                    ttsText = rem.text
                 )
             }
 

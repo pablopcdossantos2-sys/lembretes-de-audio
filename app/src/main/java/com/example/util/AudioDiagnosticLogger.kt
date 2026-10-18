@@ -34,8 +34,10 @@ enum class DiagnosticCategory {
     SYSTEM
 }
 
+private val idSequence = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+
 data class DiagnosticLogEntry(
-    val id: Long = System.nanoTime(),
+    val id: Long = idSequence.incrementAndGet(),
     val timestamp: Long = System.currentTimeMillis(),
     val formattedTime: String = formatTimestamp(timestamp),
     val level: DiagnosticLevel,
@@ -307,9 +309,11 @@ object AudioDiagnosticLogger {
                 val level = try { DiagnosticLevel.valueOf(obj.getString("level")) } catch (_: Exception) { DiagnosticLevel.INFO }
                 val category = try { DiagnosticCategory.valueOf(obj.getString("category")) } catch (_: Exception) { DiagnosticCategory.SYSTEM }
                 val details = obj.optString("details").ifBlank { null }
+                val storedId = obj.optLong("id", 0L)
+                val finalId = if (storedId > 0L) storedId else idSequence.incrementAndGet()
                 loaded.add(
                     DiagnosticLogEntry(
-                        id = obj.optLong("id", System.nanoTime()),
+                        id = finalId,
                         timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
                         formattedTime = obj.optString("formattedTime", ""),
                         level = level,

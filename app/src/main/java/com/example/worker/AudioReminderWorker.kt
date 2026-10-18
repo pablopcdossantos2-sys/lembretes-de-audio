@@ -351,7 +351,8 @@ class AudioReminderWorker(
 
             // Executa a reprodução com foco e volume calculado
             val volumeFloat = (prefs.masterVolumePercent / 100f).coerceIn(0.1f, 1.0f)
-            val playerManager = AudioPlayerManager(context)
+            val playerManager = (context.applicationContext as? com.example.AudioReminderApp)?.audioPlayerManager
+                ?: AudioPlayerManager(context)
             val playbackDone = CompletableDeferred<Unit>()
 
             val fadeInDurationMs = if (prefs.fadeInEnabled && prefs.fadeInDurationSeconds > 0) {
@@ -366,6 +367,7 @@ class AudioReminderWorker(
                     targetVolume = volumeFloat,
                     fadeInDurationMs = fadeInDurationMs,
                     audioTitle = reminderTitle,
+                    ttsText = targetReminder?.text?.ifBlank { null } ?: activeAudios.firstOrNull()?.ttsText,
                     onComplete = {
                         playbackDone.complete(Unit)
                     }

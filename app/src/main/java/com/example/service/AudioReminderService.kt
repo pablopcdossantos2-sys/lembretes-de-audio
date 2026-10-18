@@ -19,6 +19,7 @@ import com.example.data.preferences.UserPreferencesRepository
 import com.example.domain.model.AudioItem
 import com.example.domain.model.PlaybackOrder
 import com.example.domain.model.Profile
+import com.example.domain.model.RestingPeriod
 import com.example.domain.model.ScheduledTrigger
 import com.example.domain.scheduler.ScheduleCalculator
 import com.example.player.AudioPlayerManager
@@ -269,7 +270,7 @@ class AudioReminderService : Service() {
                         !isInRest
                     } ?: activeReminders.first()
 
-                    val restPeriods = if (reminder.hasRestPeriod && (reminder.startHour != reminder.endHour || reminder.startMinute != reminder.endMinute)) {
+                    val restPeriods: List<RestingPeriod> = if (reminder.hasRestPeriod && (reminder.startHour != reminder.endHour || reminder.startMinute != reminder.endMinute)) {
                         listOf(
                             RestingPeriod(
                                 label = "Repouso",
@@ -343,16 +344,22 @@ class AudioReminderService : Service() {
                     selectAudioForPlayback(activeProfile, activeAudios, prefs.lastSequentialIndex)
                 } else null
 
+                val fromReminder = activeReminders.firstOrNull()?.let { rem ->
+                    val uri = rem.audioFilePath?.takeIf { java.io.File(it).exists() }?.let { "file://$it" }
+                        ?: rem.audioUri
+                        ?: "tts:${rem.title.replace(" ", "_")}"
+                    AudioItem(
+                        id = rem.id,
+                        uriString = uri,
+                        label = rem.title,
+                        isActive = true,
+                        ttsText = rem.text
+                    )
+                }
+
                 val selectedAudio: AudioItem? = fromProfile
+                    ?: fromReminder
                     ?: activeAudios.firstOrNull()
-                    ?: activeReminders.firstOrNull()?.let { rem ->
-                        AudioItem(
-                            id = rem.id,
-                            uriString = rem.audioUri ?: "tts:${rem.title.replace(" ", "_")}",
-                            label = rem.title,
-                            isActive = true
-                        )
-                    }
 
                 if (selectedAudio != null) {
                     val playbackDone = kotlinx.coroutines.CompletableDeferred<Unit>()

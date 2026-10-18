@@ -13,20 +13,34 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
-import android.telephony.TelephonyManager
 
 object DeviceStateHelper {
 
+    // Constantes de tipos de áudio adicionados em versões mais recentes do Android (evita NoSuchFieldError em APIs < 31)
+    private const val TYPE_BLE_HEADSET_VAL = 26
+    private const val TYPE_BLE_SPEAKER_VAL = 27
+    private const val TYPE_BLE_BROADCAST_VAL = 30
+    private const val TYPE_USB_HEADSET_VAL = 22
+    private const val TYPE_USB_DEVICE_VAL = 21
+
     fun isIgnoringBatteryOptimizations(context: Context): Boolean {
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-        return powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: true
+        return try {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: true
+        } catch (_: Throwable) {
+            true
+        }
     }
 
     fun canScheduleExactAlarms(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-            alarmManager?.canScheduleExactAlarms() ?: true
-        } else {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                alarmManager?.canScheduleExactAlarms() ?: true
+            } else {
+                true
+            }
+        } catch (_: Throwable) {
             true
         }
     }
@@ -79,69 +93,87 @@ object DeviceStateHelper {
     }
 
     fun isBluetoothAudioConnected(context: Context): Boolean {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            return devices.any { device ->
-                device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                        device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                        device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                        device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: return false
+                devices.any { device ->
+                    val type = device.type
+                    type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            type == TYPE_BLE_HEADSET_VAL ||
+                            type == TYPE_BLE_SPEAKER_VAL ||
+                            type == TYPE_BLE_BROADCAST_VAL
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
             }
-        } else {
-            @Suppress("DEPRECATION")
-            return audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+        } catch (_: Throwable) {
+            false
         }
     }
 
     fun isHeadphonesConnected(context: Context): Boolean {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            return devices.any { device ->
-                device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                        device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                        device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                        device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
-                        device.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                        device.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
-                        device.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
-                        device.type == AudioDeviceInfo.TYPE_USB_DEVICE
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: return false
+                devices.any { device ->
+                    val type = device.type
+                    type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            type == TYPE_BLE_HEADSET_VAL ||
+                            type == TYPE_BLE_SPEAKER_VAL ||
+                            type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                            type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                            type == TYPE_USB_HEADSET_VAL ||
+                            type == TYPE_USB_DEVICE_VAL
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.isWiredHeadsetOn || audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
             }
-        } else {
-            @Suppress("DEPRECATION")
-            return audioManager.isWiredHeadsetOn || audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+        } catch (_: Throwable) {
+            false
         }
     }
 
     fun getConnectedAudioDevicesDescription(context: Context): String {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return "Indisponível"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            val names = devices.mapNotNull { device ->
-                when (device.type) {
-                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-                    AudioDeviceInfo.TYPE_BLE_HEADSET,
-                    AudioDeviceInfo.TYPE_BLE_SPEAKER -> "Fone Bluetooth (${device.productName.ifBlank { "Sem nome" }})"
-                    AudioDeviceInfo.TYPE_WIRED_HEADSET,
-                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Fone com Fio (P2 / P3)"
-                    AudioDeviceInfo.TYPE_USB_HEADSET,
-                    AudioDeviceInfo.TYPE_USB_DEVICE -> "Fone / Áudio USB"
-                    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Alto-falante Embutido"
-                    else -> null
-                }
-            }.distinct()
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return "Alto-falante do Celular"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: emptyArray()
+                val names = devices.mapNotNull { device ->
+                    val rawName = try { device.productName?.toString()?.trim() } catch (_: Throwable) { null }
+                    val label = if (!rawName.isNullOrBlank()) rawName else "Sem nome"
+                    when (device.type) {
+                        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                        TYPE_BLE_HEADSET_VAL,
+                        TYPE_BLE_SPEAKER_VAL,
+                        TYPE_BLE_BROADCAST_VAL -> "Fone Bluetooth ($label)"
+                        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                        AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Fone com Fio (P2 / P3)"
+                        TYPE_USB_HEADSET_VAL,
+                        TYPE_USB_DEVICE_VAL -> "Fone / Áudio USB"
+                        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Alto-falante Embutido"
+                        else -> null
+                    }
+                }.distinct()
 
-            return if (names.isEmpty()) "Alto-falante Padrão do Celular" else names.joinToString(", ")
-        } else {
-            val isHeadset = @Suppress("DEPRECATION") audioManager.isWiredHeadsetOn
-            val isBt = @Suppress("DEPRECATION") (audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn)
-            return when {
-                isBt -> "Fone Bluetooth Conectado"
-                isHeadset -> "Fone com Fio Conectado"
-                else -> "Alto-falante do Celular"
+                if (names.isEmpty()) "Alto-falante Padrão do Celular" else names.joinToString(", ")
+            } else {
+                val isHeadset = @Suppress("DEPRECATION") try { audioManager.isWiredHeadsetOn } catch (_: Throwable) { false }
+                val isBt = @Suppress("DEPRECATION") try { audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn } catch (_: Throwable) { false }
+                when {
+                    isBt -> "Fone Bluetooth Conectado"
+                    isHeadset -> "Fone com Fio Conectado"
+                    else -> "Alto-falante do Celular"
+                }
             }
+        } catch (_: Throwable) {
+            "Alto-falante do Celular"
         }
     }
 

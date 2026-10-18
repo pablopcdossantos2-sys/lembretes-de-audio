@@ -174,104 +174,125 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
         ttsText: String? = null,
         onComplete: () -> Unit = {}
     ) {
-        stop()
+        try {
+            stop()
 
-        val isHeadphones = DeviceStateHelper.isHeadphonesConnected(context)
-        val deviceDesc = DeviceStateHelper.getConnectedAudioDevicesDescription(context)
-        AudioDiagnosticLogger.logAudioRouting(isHeadphones, deviceDesc)
+            val isHeadphones = try { DeviceStateHelper.isHeadphonesConnected(context) } catch (_: Throwable) { false }
+            val deviceDesc = try { DeviceStateHelper.getConnectedAudioDevicesDescription(context) } catch (_: Throwable) { "Alto-falante do Celular" }
+            try { AudioDiagnosticLogger.logAudioRouting(isHeadphones, deviceDesc) } catch (_: Throwable) {}
 
-        requestAudioFocus(isHeadphones)
+            try { requestAudioFocus(isHeadphones) } catch (_: Throwable) {}
 
-        val clampedTargetVolume = targetVolume.coerceIn(0.01f, 1.0f)
-        prepareAudioVolume(clampedTargetVolume, useAppVolumeOnly, isHeadphones)
+            val clampedTargetVolume = targetVolume.coerceIn(0.1f, 1.0f)
+            try { prepareAudioVolume(clampedTargetVolume, useAppVolumeOnly, isHeadphones) } catch (_: Throwable) {}
 
-        val streamTypeStr = if (isHeadphones) "STREAM_MUSIC (Fones)" else "STREAM_MUSIC (Alto-falante)"
-        AudioDiagnosticLogger.logPlaybackStart(
-            title = audioTitle,
-            uri = uriString,
-            isHeadphones = isHeadphones,
-            volumePercent = (clampedTargetVolume * 100).toInt(),
-            streamType = streamTypeStr,
-            details = "Fade-in: ${fadeInDurationMs}ms"
-        )
+            val streamTypeStr = if (isHeadphones) "STREAM_MUSIC (Fones)" else "STREAM_ALARM / STREAM_MUSIC (Alto-falante)"
+            try {
+                AudioDiagnosticLogger.logPlaybackStart(
+                    title = audioTitle,
+                    uri = uriString,
+                    isHeadphones = isHeadphones,
+                    volumePercent = (clampedTargetVolume * 100).toInt(),
+                    streamType = streamTypeStr,
+                    details = "Fade-in: ${fadeInDurationMs}ms"
+                )
+            } catch (_: Throwable) {}
 
-        // Resolve caminho do arquivo no armazenamento local
-        val uri = Uri.parse(uriString)
-        val cleanPath = when {
-            uri.scheme == null -> uriString
-            uri.scheme == "file" -> uri.path ?: uriString.removePrefix("file://").removePrefix("file:")
-            else -> null
-        }
-        val targetFile = cleanPath?.let { File(it) }
-        val hasRealAudioFile = targetFile != null && targetFile.exists() && targetFile.canRead()
+            // Resolve caminho do arquivo no armazenamento local
+            val uri = try { Uri.parse(uriString) } catch (_: Throwable) { null }
+            val cleanPath = when {
+                uri == null -> uriString
+                uri.scheme == null -> uriString
+                uri.scheme == "file" -> uri.path ?: uriString.removePrefix("file://").removePrefix("file:")
+                else -> null
+            }
+            val targetFile = cleanPath?.let { File(it) }
+            val hasRealAudioFile = targetFile != null && targetFile.exists() && targetFile.canRead() && targetFile.length() > 0
 
-        // Se for um arquivo de som gravado ou chime WAV gerado no armazenamento, toca via MediaPlayer
-        if (hasRealAudioFile) {
-            playMediaPlayerFile(
-                file = targetFile!!,
-                audioTitle = audioTitle,
-                clampedTargetVolume = clampedTargetVolume,
-                fadeInDurationMs = fadeInDurationMs,
+            // Se for um arquivo de som gravado ou arquivo local existente, toca via MediaPlayer
+            if (hasRealAudioFile) {
+                playMediaPlayerFile(
+                    file = targetFile!!,
+                    audioTitle = audioTitle,
+                    clampedTargetVolume = clampedTargetVolume,
+                    fadeInDurationMs = fadeInDurationMs,
+                    onComplete = onComplete
+                )
+                return
+            }
+
+            // Se for um URI content:// (ex: importado do sistema de arquivos)
+            if (uri != null && uri.scheme == "content") {
+                playMediaPlayerSource(
+                    sourceUri = uri,
+                    filePath = null,
+                    audioTitle = audioTitle,
+                    clampedTargetVolume = clampedTargetVolume,
+                    fadeInDurationMs = fadeInDurationMs,
+                    onComplete = onComplete
+                )
+                return
+            }
+
+            // Se for um item TTS com chave correspondente (ex: tts:beba_agua), verifica se temos o chime WAV equivalente
+            val fallbackFiles = try {
+                com.example.util.AudioSampleGenerator.ensureDefaultAudioFiles(context)
+            } catch (_: Throwable) {
+                emptyList()
+            }
+
+            val matchingChime = when {
+                uriString.contains("agua") -> fallbackFiles.getOrNull(0)
+                uriString.contains("postura") -> fallbackFiles.getOrNull(1)
+                uriString.contains("respiracao") -> fallbackFiles.getOrNull(2)
+                else -> fallbackFiles.firstOrNull()
+            }
+
+            if (matchingChime != null && matchingChime.exists() && matchingChime.length() > 0) {
+                // Toca o chime melódico agradável com MediaPlayer e, se o TTS estiver disponível, fala em seguida
+                playMediaPlayerFile(
+                    file = matchingChime,
+                    audioTitle = audioTitle,
+                    clampedTargetVolume = clampedTargetVolume,
+                    fadeInDurationMs = fadeInDurationMs,
+                    isChimeBeforeTts = true,
+                    onComplete = {
+                        val textToSpeak = when {
+                            !ttsText.isNullOrBlank() -> ttsText
+                            else -> uriString.removePrefix("tts:").replace("_", " ")
+                        }
+                        if (textToSpeak.isNotBlank()) {
+                            speakTts(
+                                text = textToSpeak,
+                                volume = clampedTargetVolume,
+                                useAppVolumeOnly = useAppVolumeOnly,
+                                onComplete = onComplete
+                            )
+                        } else {
+                            restoreSpeakerVolume()
+                            abandonAudioFocus()
+                            onComplete()
+                        }
+                    }
+                )
+                return
+            }
+
+            // Caso contrário, sintetiza diretamente via TTS com watchdog timeout
+            val textToSpeak = when {
+                !ttsText.isNullOrBlank() -> ttsText
+                else -> uriString.removePrefix("tts:").replace("_", " ")
+            }
+            speakTts(
+                text = textToSpeak,
+                volume = clampedTargetVolume,
+                useAppVolumeOnly = useAppVolumeOnly,
                 onComplete = onComplete
             )
-            return
+        } catch (e: Throwable) {
+            Log.e(TAG, "playAudio critical exception", e)
+            playFallbackTone(targetVolume.coerceIn(0.1f, 1.0f), onComplete)
         }
-
-        // Se for um item TTS com chave correspondente (ex: tts:beba_agua), verifica se temos o chime WAV equivalente
-        val fallbackFiles = try {
-            com.example.util.AudioSampleGenerator.ensureDefaultAudioFiles(context)
-        } catch (_: Throwable) {
-            emptyList()
-        }
-
-        val matchingChime = when {
-            uriString.contains("agua") -> fallbackFiles.getOrNull(0)
-            uriString.contains("postura") -> fallbackFiles.getOrNull(1)
-            uriString.contains("respiracao") -> fallbackFiles.getOrNull(2)
-            else -> fallbackFiles.firstOrNull()
-        }
-
-        if (matchingChime != null && matchingChime.exists()) {
-            // Toca o chime melódico agradável com MediaPlayer e, se o TTS estiver disponível, fala em seguida
-            playMediaPlayerFile(
-                file = matchingChime,
-                audioTitle = audioTitle,
-                clampedTargetVolume = clampedTargetVolume,
-                fadeInDurationMs = fadeInDurationMs,
-                isChimeBeforeTts = true,
-                onComplete = {
-                    val textToSpeak = when {
-                        !ttsText.isNullOrBlank() -> ttsText
-                        else -> uriString.removePrefix("tts:").replace("_", " ")
-                    }
-                    if (textToSpeak.isNotBlank()) {
-                        speakTts(
-                            text = textToSpeak,
-                            volume = clampedTargetVolume,
-                            useAppVolumeOnly = useAppVolumeOnly,
-                            onComplete = onComplete
-                        )
-                    } else {
-                        restoreSpeakerVolume()
-                        abandonAudioFocus()
-                        onComplete()
-                    }
-                }
-            )
-            return
-        }
-
-        // Caso contrário, sintetiza diretamente via TTS com watchdog timeout
-        val textToSpeak = when {
-            !ttsText.isNullOrBlank() -> ttsText
-            else -> uriString.removePrefix("tts:").replace("_", " ")
-        }
-        speakTts(
-            text = textToSpeak,
-            volume = clampedTargetVolume,
-            useAppVolumeOnly = useAppVolumeOnly,
-            onComplete = onComplete
-        )
     }
 
     private fun playMediaPlayerFile(
@@ -282,21 +303,51 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
         isChimeBeforeTts: Boolean = false,
         onComplete: () -> Unit
     ) {
+        playMediaPlayerSource(
+            sourceUri = null,
+            filePath = file.absolutePath,
+            audioTitle = audioTitle,
+            clampedTargetVolume = clampedTargetVolume,
+            fadeInDurationMs = fadeInDurationMs,
+            isChimeBeforeTts = isChimeBeforeTts,
+            onComplete = onComplete
+        )
+    }
+
+    private fun playMediaPlayerSource(
+        sourceUri: Uri?,
+        filePath: String?,
+        audioTitle: String,
+        clampedTargetVolume: Float,
+        fadeInDurationMs: Long,
+        isChimeBeforeTts: Boolean = false,
+        onComplete: () -> Unit
+    ) {
         try {
             val startTimeMs = System.currentTimeMillis()
+            val isHeadphones = try { DeviceStateHelper.isHeadphonesConnected(context) } catch (_: Throwable) { false }
             val player = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(if (isHeadphones) AudioAttributes.USAGE_MEDIA else AudioAttributes.USAGE_ALARM)
+                        .setContentType(if (isHeadphones) AudioAttributes.CONTENT_TYPE_MUSIC else AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
 
-                setDataSource(file.absolutePath)
+                if (filePath != null && File(filePath).exists() && File(filePath).canRead()) {
+                    setDataSource(filePath)
+                } else if (sourceUri != null && sourceUri.scheme == "content") {
+                    setDataSource(context, sourceUri)
+                } else if (sourceUri != null && (sourceUri.scheme == "file" || sourceUri.scheme == null)) {
+                    val p = sourceUri.path ?: sourceUri.toString().removePrefix("file://")
+                    setDataSource(p)
+                } else {
+                    throw IllegalArgumentException("Arquivo de áudio não encontrado")
+                }
 
                 setOnCompletionListener {
                     val duration = System.currentTimeMillis() - startTimeMs
-                    AudioDiagnosticLogger.logPlaybackEnd(audioTitle, duration, success = true)
+                    try { AudioDiagnosticLogger.logPlaybackEnd(audioTitle, duration, success = true) } catch (_: Throwable) {}
                     if (!isChimeBeforeTts) {
                         restoreSpeakerVolume()
                         abandonAudioFocus()
@@ -305,11 +356,13 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 }
 
                 setOnErrorListener { _, what, extra ->
-                    AudioDiagnosticLogger.logPlaybackError(
-                        title = audioTitle,
-                        errorMessage = "MediaPlayer erro interno (what=$what, extra=$extra)",
-                        details = "Executando tom sonoro de emergência para não deixar o lembrete silencioso"
-                    )
+                    try {
+                        AudioDiagnosticLogger.logPlaybackError(
+                            title = audioTitle,
+                            errorMessage = "MediaPlayer erro interno (what=$what, extra=$extra)",
+                            details = "Executando tom sonoro de emergência para não deixar o lembrete silencioso"
+                        )
+                    } catch (_: Throwable) {}
                     restoreSpeakerVolume()
                     abandonAudioFocus()
                     playFallbackTone(clampedTargetVolume, onComplete)
@@ -330,11 +383,13 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 player.start()
             }
         } catch (e: Exception) {
-            AudioDiagnosticLogger.logPlaybackError(
-                title = audioTitle,
-                errorMessage = "Falha ao abrir mídia: ${e.message}",
-                details = "Acionando tom alternativo audível"
-            )
+            try {
+                AudioDiagnosticLogger.logPlaybackError(
+                    title = audioTitle,
+                    errorMessage = "Falha ao abrir mídia: ${e.message}",
+                    details = "Acionando tom alternativo audível"
+                )
+            } catch (_: Throwable) {}
             restoreSpeakerVolume()
             abandonAudioFocus()
             playFallbackTone(clampedTargetVolume, onComplete)
@@ -473,17 +528,17 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             // Fallback via ToneGenerator se não for possível abrir o arquivo
             scope.launch(Dispatchers.IO) {
                 try {
-                    val stream = AudioManager.STREAM_MUSIC
-                    val volPercent = (volumeFraction * 100).toInt().coerceIn(60, 100)
+                    val stream = AudioManager.STREAM_ALARM
+                    val volPercent = (volumeFraction * 100).toInt().coerceIn(75, 100)
                     val toneGen = ToneGenerator(stream, volPercent)
-                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 700)
-                    delay(800L)
+                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 900)
+                    delay(1000L)
                     toneGen.release()
                     AudioDiagnosticLogger.log(
                         level = DiagnosticLevel.SUCCESS,
                         category = DiagnosticCategory.PLAYBACK,
                         message = "Tom sonoro alternativo executado com sucesso",
-                        details = "Stream: $stream | Volume: $volPercent%"
+                        details = "Stream: STREAM_ALARM | Volume: $volPercent%"
                     )
                 } catch (e: Exception) {
                     Log.e(TAG, "Fallback tone error", e)

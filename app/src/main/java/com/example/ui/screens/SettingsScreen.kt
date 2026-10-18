@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -2311,7 +2312,7 @@ fun DiagnosticsSettingsContent(
                 }
             }
         } else {
-            items(filteredLogs, key = { it.id }) { logItem ->
+            itemsIndexed(filteredLogs, key = { index, item -> "${item.id}_${item.timestamp}_$index" }) { _, logItem ->
                 DiagnosticLogItemCard(entry = logItem)
             }
         }
