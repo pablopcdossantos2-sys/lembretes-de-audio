@@ -75,6 +75,12 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
 
                 // Define ou localiza o perfil de usuário associado
                 val targetProfileId: Long = if (selectedProfileId != null && selectedProfileId > 0) {
+                    val p = database.profileDao().getProfileWithRestsById(selectedProfileId)
+                    if (p != null) {
+                        val currentCsv = p.profile.audioIdsCsv
+                        val newCsv = if (currentCsv.isBlank()) audioId.toString() else "$currentCsv,$audioId"
+                        database.profileDao().updateProfile(p.profile.copy(audioIdsCsv = newCsv))
+                    }
                     selectedProfileId
                 } else {
                     // Cria perfil com horário contínuo de 24h e descanso dedicado se configurado

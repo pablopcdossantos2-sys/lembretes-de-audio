@@ -122,11 +122,13 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             val minAudibleVol = (maxVol * 0.70f).toInt().coerceAtLeast(1)
             val desiredVol = (maxVol * volumeFraction).toInt().coerceIn(minAudibleVol, maxVol)
 
-            if (useAppVolumeOnly || currentVol < desiredVol || currentVol == 0) {
+            if (!useAppVolumeOnly && (currentVol < desiredVol || currentVol == 0)) {
                 if (previousMusicVolume == null) {
                     previousMusicVolume = currentVol
                 }
-                audioManager.setStreamVolume(targetStream, desiredVol, 0)
+                try {
+                    audioManager.setStreamVolume(targetStream, desiredVol, 0)
+                } catch (_: Exception) {}
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.ROUTING,
@@ -135,16 +137,18 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 )
             }
 
-            // Garante também volume no stream de alarmes
-            val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-            val currentAlarm = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
-            if (currentAlarm < (maxAlarm * 0.5f).toInt()) {
-                if (previousAlarmVolume == null) {
-                    previousAlarmVolume = currentAlarm
+            // Garante também volume no stream de alarmes de forma segura
+            try {
+                val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                val currentAlarm = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+                if (currentAlarm < (maxAlarm * 0.5f).toInt()) {
+                    if (previousAlarmVolume == null) {
+                        previousAlarmVolume = currentAlarm
+                    }
+                    val desiredAlarm = (maxAlarm * volumeFraction).toInt().coerceIn(1, maxAlarm)
+                    audioManager.setStreamVolume(AudioManager.STREAM_ALARM, desiredAlarm, 0)
                 }
-                val desiredAlarm = (maxAlarm * volumeFraction).toInt().coerceIn(1, maxAlarm)
-                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, desiredAlarm, 0)
-            }
+            } catch (_: Exception) {}
         } catch (e: Exception) {
             Log.w(TAG, "Não foi possível ajustar volume de áudio", e)
         }
@@ -329,8 +333,8 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             val player = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(if (isHeadphones) AudioAttributes.USAGE_MEDIA else AudioAttributes.USAGE_ALARM)
-                        .setContentType(if (isHeadphones) AudioAttributes.CONTENT_TYPE_MUSIC else AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
 
@@ -528,7 +532,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             // Fallback via ToneGenerator se não for possível abrir o arquivo
             scope.launch(Dispatchers.IO) {
                 try {
-                    val stream = AudioManager.STREAM_ALARM
+                    val stream = AudioManager.STREAM_MUSIC
                     val volPercent = (volumeFraction * 100).toInt().coerceIn(75, 100)
                     val toneGen = ToneGenerator(stream, volPercent)
                     toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 900)
@@ -538,7 +542,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                         level = DiagnosticLevel.SUCCESS,
                         category = DiagnosticCategory.PLAYBACK,
                         message = "Tom sonoro alternativo executado com sucesso",
-                        details = "Stream: STREAM_ALARM | Volume: $volPercent%"
+                        details = "Stream: STREAM_MUSIC | Volume: $volPercent%"
                     )
                 } catch (e: Exception) {
                     Log.e(TAG, "Fallback tone error", e)
