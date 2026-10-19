@@ -307,6 +307,6 @@ class BackupManager(
     }
 
     private companion object {
-        const val BACKUP_VERSION = 1
+        const val BACKUP_VERSION = 2
     }
 }
