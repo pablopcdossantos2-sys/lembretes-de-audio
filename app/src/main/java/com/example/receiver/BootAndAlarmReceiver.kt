@@ -29,33 +29,27 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
 
         when (action) {
             AudioReminderService.ACTION_TRIGGER_ALARM -> {
-                val pendingResult = goAsync()
-                AudioDiagnosticLogger.log(
-                    level = DiagnosticLevel.INFO,
-                    category = DiagnosticCategory.ALARM,
-                    message = "BootAndAlarmReceiver recebeu ACTION_TRIGGER_ALARM",
-                    details = "Executando reprodução de áudio prioritária com WakeLock ativo"
-                )
-
-                CoroutineScope(Dispatchers.IO).launch {
-                    val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-                    val wakeLock = powerManager?.newWakeLock(
-                        PowerManager.PARTIAL_WAKE_LOCK,
-                        "AudioReminder:AlarmWakeLock"
-                    )?.apply {
-                        acquire(120_000L)
+                // O Receiver não seleciona nem reproduz áudio: delega o disparo ao
+                // único caminho de reprodução, no serviço em primeiro plano.
+                val serviceIntent = Intent(context, AudioReminderService::class.java).apply {
+                    this.action = AudioReminderService.ACTION_TRIGGER_ALARM
+                    putExtra(
+                        AudioReminderService.EXTRA_EXPECTED_TIME_MILLIS,
+                        intent.getLongExtra(AudioReminderService.EXTRA_EXPECTED_TIME_MILLIS, 0L)
+                    )
+                }
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
                     }
-
-                    try {
-                        executeDirectPlayback(context, intent)
-                    } finally {
-                        try {
-                            if (wakeLock?.isHeld == true) {
-                                wakeLock.release()
-                            }
-                        } catch (_: Throwable) {}
-                        pendingResult.finish()
-                    }
+                } catch (e: Exception) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.ERROR,
+                        category = DiagnosticCategory.ALARM,
+                        message = "Não foi possível iniciar o serviço para o alarme: ${e.message}"
+                    )
                 }
             }
 
@@ -96,9 +90,8 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                         val prefs = prefsRepo.getPreferences()
                         if (prefs.isAppMasterEnabled) {
                             rescheduleDirectAlarm(context)
-                            try {
-                                AudioReminderService.startOrRefresh(context)
-                            } catch (_: Throwable) {}
+                            // No boot, apenas reagenda. O serviço de mediaPlayback será
+                            // iniciado quando o alarme disparar ou o usuário abrir o app.
                             com.example.worker.ReminderWorkScheduler.scheduleWorkBasedOnActiveSettings(context)
                         }
                     } catch (e: Throwable) {

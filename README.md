@@ -11,7 +11,7 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
    - Intervalos de repetição de 5 a 120 minutos.
    - Seleção de dias da semana (Segunda a Domingo) com detecção e aviso de conflitos de prioridade.
    - **Múltiplos Períodos de Descanso (*Resting Periods*):** Silenciamento automático durante horários de repouso (ex: Almoço 12:00 às 13:00, Pausa para café 16:00 às 16:30).
-   - Políticas de retomada pós-descanso configuráveis (`NEXT_GRID_MARK`, `NEXT_FULL_INTERVAL`, `RETRY_MISSED`).
+   - Políticas de retomada pós-descanso configuráveis (`NEXT_GRID_MARK`, `AT_REST_END`).
    - Modos de reprodução: Sequencial, Aleatório Ponderado por pesos (1 a 5) ou Áudio específico.
    - Suavização de volume (*Fade-in*) global ou personalizada por perfil (0.5s a 10s).
 
@@ -22,22 +22,29 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
    - Controle individual de volume (0 a 100%) e peso no sorteio para cada áudio.
 
 3. **Arquitetura e Robustez em Segundo Plano:**
-   - **Room Database:** Persistência local segura de áudios, perfis, períodos de descanso e lembretes gravados.
-   - **WorkManager & Exact Alarms:** Agendamentos de alta precisão via `AlarmManager` e `CoroutineWorker`.
-   - **Foreground Service:** Serviço de execução em primeiro plano com tipo `mediaPlayback` para confiabilidade em tela bloqueada.
-   - **Tratamento de Estado do Dispositivo:** Respeita chamadas telefônicas em andamento, modo Não Perturbe (DND) e fones Bluetooth.
-   - **Assistente de Otimização de Bateria:** Verificação e atalhos para desativar otimizações de bateria agressivas do sistema.
+   - **Room Database:** Persistência local de áudios, perfis, períodos de descanso e lembretes gravados.
+   - **WorkManager & Exact Alarms:** Agendamentos via `AlarmManager` e `CoroutineWorker`.
+   - **Foreground Service:** Serviço em primeiro plano com tipo `mediaPlayback` para confiabilidade em tela bloqueada.
+   - **Tratamento de Estado do Dispositivo:** Tratamento de chamadas, modo Não Perturbe (DND) e dispositivos Bluetooth.
+   - **Assistente de Otimização de Bateria:** Verificação e atalhos para configurações de bateria do sistema.
 
 4. **Backup e Portabilidade:**
-   - Exportação e importação completa de dados e configurações em formato JSON.
+   - Exportação/importação de preferências, perfis, períodos de descanso, metadados dos áudios e lembretes em JSON.
+   - **Limitação atual:** o JSON não inclui os bytes dos arquivos de áudio locais. Após importar em outro dispositivo, os arquivos precisam ser copiados/importados novamente; referências a arquivos ausentes são desativadas para evitar falhas de reprodução.
 
 ---
 
 ## Arquitetura do Projeto
 
-- **Linguagem:** Kotlin 2.1
+- **Linguagem:** Kotlin
 - **UI Toolkit:** Jetpack Compose (Material Design 3)
 - **Banco de Dados:** Room Database
 - **Preferências:** Jetpack DataStore Preferences
 - **Segundo Plano:** WorkManager, Foreground Service, BroadcastReceivers
 - **Áudio:** Android MediaPlayer, AudioFocusManager, TextToSpeech
+
+## Integridade dos dados e desenvolvimento
+
+- O banco Room **não deve apagar automaticamente os dados** quando uma migração estiver ausente. A configuração atual não usa migração destrutiva de fallback.
+- Sempre que a estrutura das entidades/tabelas mudar, aumente a versão do banco e implemente uma migração Room explícita, testando a preservação de perfis, áudios, períodos de descanso e lembretes.
+- A integração contínua executa os testes unitários e gera a variante debug do aplicativo em GitHub Actions. Isso não substitui os testes posteriores em um dispositivo Android real.

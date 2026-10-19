@@ -42,6 +42,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     private var currentFadeJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var ttsWatchdogRunnable: Runnable? = null
 
     private var previousAlarmVolume: Int? = null
     private var previousMusicVolume: Int? = null
@@ -472,10 +473,14 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 playFallbackTone(clampedVol, onComplete)
             }
         }
-        mainHandler.postDelayed(watchdogRunnable, 4000L)
+        ttsWatchdogRunnable?.let(mainHandler::removeCallbacks)
+        ttsWatchdogRunnable = watchdogRunnable
+        mainHandler.postDelayed(watchdogRunnable, (3000L + 90L * text.length).coerceIn(4000L, 60_000L))
 
         textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
+                mainHandler.removeCallbacks(watchdogRunnable)
+                mainHandler.postDelayed(watchdogRunnable, (3000L + 90L * text.length).coerceIn(4000L, 60_000L))
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.PLAYBACK,
@@ -486,6 +491,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
 
             override fun onDone(utteranceId: String?) {
                 mainHandler.removeCallbacks(watchdogRunnable)
+                if (ttsWatchdogRunnable === watchdogRunnable) ttsWatchdogRunnable = null
                 if (!hasFinished) {
                     hasFinished = true
                     mainHandler.post {
@@ -520,6 +526,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
         val speakResult = textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
         if (speakResult != TextToSpeech.SUCCESS) {
             mainHandler.removeCallbacks(watchdogRunnable)
+            if (ttsWatchdogRunnable === watchdogRunnable) ttsWatchdogRunnable = null
             hasFinished = true
             AudioDiagnosticLogger.logPlaybackError(
                 title = "TTS: $text",
@@ -645,6 +652,8 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     }
 
     fun stop() {
+        ttsWatchdogRunnable?.let(mainHandler::removeCallbacks)
+        ttsWatchdogRunnable = null
         currentFadeJob?.cancel()
         currentFadeJob = null
 

@@ -39,7 +39,7 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles ORDER BY priority DESC, id ASC")
     suspend fun getAllProfilesWithReminders(): List<ProfileWithReminders>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert
     suspend fun insertProfile(profile: ProfileEntity): Long
 
     @Update
@@ -62,7 +62,12 @@ interface ProfileDao {
 
     @Transaction
     suspend fun upsertProfileWithRests(profile: ProfileEntity, rests: List<RestingPeriodEntity>): Long {
-        val profileId = insertProfile(profile)
+        val profileId = if (profile.id > 0L) {
+            updateProfile(profile)
+            profile.id
+        } else {
+            insertProfile(profile)
+        }
         deleteRestingPeriodsForProfile(profileId)
         if (rests.isNotEmpty()) {
             val restsWithId = rests.map { it.copy(profileId = profileId) }
