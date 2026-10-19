@@ -82,7 +82,7 @@ abstract class AppDatabase : RoomDatabase() {
             val existingProfiles = profileDao.getAllProfilesWithRests()
             val existingAudios = audioDao.getAllAudios()
 
-            if (existingProfiles.isEmpty() && existingAudios.isEmpty()) {
+            if (existingProfiles.isEmpty() || existingAudios.isEmpty()) {
                 populateInitialData(database, context)
                 if (context != null) {
                     try {
@@ -110,6 +110,8 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             } else emptyList()
 
+            // Repara somente a coleção ausente; nunca duplica a coleção que já contém dados.
+            if (profileDao.getAllProfilesWithRests().isEmpty()) {
             // Perfil Comercial (Segunda a Sexta, 08:00 às 18:00, a cada 15 min - sem descansos forçados)
             val commercial = ProfileEntity(
                 name = "Horário Comercial",
@@ -164,8 +166,11 @@ abstract class AppDatabase : RoomDatabase() {
             )
             profileDao.upsertProfileWithRests(daily, emptyList())
 
+            }
+
             // Adiciona áudios iniciais reais (arquivos WAV gerados com melodia harmônica)
             val audioDao = database.audioDao()
+            if (audioDao.getAllAudios().isEmpty()) {
             val uriWater = if (bundledFiles.isNotEmpty() && bundledFiles[0].exists()) {
                 "file://${bundledFiles[0].absolutePath}"
             } else {
@@ -210,6 +215,7 @@ abstract class AppDatabase : RoomDatabase() {
                 ttsText = "Inspire profundamente e relaxe os ombros por alguns segundos."
             )
             audioDao.insertAudios(listOf(demoAudio1, demoAudio2, demoAudio3))
+            }
         }
         }
     }
