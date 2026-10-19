@@ -9,6 +9,7 @@ import com.example.data.backup.BackupManager
 import com.example.data.backup.ImportResult
 import com.example.data.db.AudioItemEntity
 import com.example.data.db.ProfileEntity
+import com.example.data.db.ReminderFrequencyUpdater
 import com.example.data.db.ProfileWithRestingPeriods
 import com.example.data.preferences.UserPreferences
 import com.example.domain.model.AudioItem
@@ -292,35 +293,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             database.audioDao().updateAudio(AudioItemEntity.fromDomain(audio))
 
             if (intervalMinutes != null) {
-                val profiles = database.profileDao().getAllProfilesWithRests()
-                val specificallyLinkedProfiles = profiles.filter { item ->
-                    item.profile.specificAudioId == audio.id ||
-                        item.profile.audioIdsCsv.split(",").mapNotNull { it.trim().toLongOrNull() }.contains(audio.id)
-                }
-                // An empty audioIdsCsv with no specificAudioId means the profile schedules the library as a whole.
-                val sharedProfiles = profiles.filter { item ->
-                    item.profile.specificAudioId == null && item.profile.audioIdsCsv.isBlank()
-                }
-                val targets = (specificallyLinkedProfiles + sharedProfiles).distinctBy { it.profile.id }
-                val matchingReminders = database.reminderDao().getAllReminders().filter { reminder ->
-                    reminder.audioUri == audio.uriString
-                }
-                val clampedInterval = intervalMinutes.coerceIn(5, 120)
-
-                targets.forEach { item ->
-                    database.profileDao().updateProfile(item.profile.copy(intervalMinutes = clampedInterval))
-                }
-                matchingReminders.forEach { reminder ->
-                    database.reminderDao().updateReminder(reminder.copy(intervalMinutes = clampedInterval))
-                }
-
-                if (targets.isEmpty() && matchingReminders.isEmpty()) {
+                val result = ReminderFrequencyUpdater.update(
+                    database = database,
+                    audioId = audio.id,
+                    audioUri = audio.uriString,
+                    requestedIntervalMinutes = intervalMinutes
+                )
+                if (!result.applied) {
                     _userMessage.emit(
                         "Áudio salvo. Não há perfil ou lembrete vinculado a este item para alterar a frequência."
                     )
                 } else {
                     _userMessage.emit(
-                        "Frequência atualizada para $clampedInterval minutos nos perfis e lembretes vinculados."
+                        "Frequência atualizada para ${result.intervalMinutes} minutos nos perfis e lembretes vinculados."
                     )
                 }
             }
