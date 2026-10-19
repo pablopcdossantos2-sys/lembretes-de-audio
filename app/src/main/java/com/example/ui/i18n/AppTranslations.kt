@@ -359,7 +359,9 @@ private val spanish = mapOf(
 )
 
 @Composable
-fun tr(text: String): String = when (LocalAppLanguage.current) {
+fun tr(text: String): String = translateText(text, LocalAppLanguage.current)
+
+fun translateText(text: String, language: String): String = when (language) {
     "en" -> english[text] ?: dynamicTranslation(text, "en")
     "es" -> spanish[text] ?: dynamicTranslation(text, "es")
     else -> text
@@ -367,6 +369,17 @@ fun tr(text: String): String = when (LocalAppLanguage.current) {
 
 private fun dynamicTranslation(text: String, language: String): String {
     if (language == "en") {
+        if (text == "Adicione pelo menos um áudio ativo na biblioteca antes de ativar o app.") return "Add at least one active audio item to the library before enabling the app."
+        if (text == "Ative ou crie pelo menos um perfil de funcionamento antes de ligar o app.") return "Enable or create at least one scheduling profile before turning the app on."
+        if (text == "Lembretes retomados.") return "Reminders resumed."
+        if (text == "Cópia aparada adicionada à biblioteca!") return "Trimmed copy added to the library!"
+        if (text == "Teste no alto-falante concluído com sucesso!") return "Speaker test completed successfully!"
+        if (text == "Nenhum áudio ou lembrete encontrado para testar.") return "No audio or reminder found to test."
+        if (text == "Reprodução de lembrete concluída!") return "Reminder playback completed!"
+        if (text == "Perfil excluído.") return "Profile deleted."
+        if (text == "Horário de descanso salvo e integrado ao WorkManager.") return "Rest schedule saved and integrated with WorkManager."
+        if (text.startsWith("Silenciado por ") && text.endsWith(" minutos.")) return text.replace("Silenciado por ", "Muted for ").replace(" minutos.", " minutes.")
+        if (text.endsWith(" áudio(s) adicionado(s) à biblioteca.")) return text.replace(" áudio(s) adicionado(s) à biblioteca.", " audio item(s) added to the library.")
         if (text.startsWith("• ") && text.endsWith(" perfis importados")) return text.replace(" perfis importados", " profiles imported")
         if (text.startsWith("• ") && text.endsWith(" referências de áudios importadas")) return text.replace(" referências de áudios importadas", " audio references imported")
         if (text == "Pesquisar áudios e lembretes...") return "Search audio and reminders..."
@@ -376,6 +389,17 @@ private fun dynamicTranslation(text: String, language: String): String {
         if (text.startsWith("Áudio salvo.")) return text.replace("Áudio salvo.", "Audio saved.").replace("Não há perfil ou lembrete vinculado a este item para alterar a frequência.", "No profile or reminder is linked to this item, so its frequency cannot be changed.")
         if (text.startsWith("Lembrete \"") && text.endsWith("\" adicionado com sucesso.")) return text.replace("Lembrete \"", "Reminder \"").replace("\" adicionado com sucesso.", "\" added successfully.")
     } else if (language == "es") {
+        if (text == "Adicione pelo menos um áudio ativo na biblioteca antes de ativar o app.") return "Añade al menos un audio activo a la biblioteca antes de activar la aplicación."
+        if (text == "Ative ou crie pelo menos um perfil de funcionamento antes de ligar o app.") return "Activa o crea al menos un perfil de programación antes de encender la aplicación."
+        if (text == "Lembretes retomados.") return "Recordatorios reanudados."
+        if (text == "Cópia aparada adicionada à biblioteca!") return "¡Copia recortada añadida a la biblioteca!"
+        if (text == "Teste no alto-falante concluído com sucesso!") return "¡Prueba del altavoz completada correctamente!"
+        if (text == "Nenhum áudio ou lembrete encontrado para testar.") return "No se encontró audio ni recordatorio para probar."
+        if (text == "Reprodução de lembrete concluída!") return "¡Reproducción del recordatorio completada!"
+        if (text == "Perfil excluído.") return "Perfil eliminado."
+        if (text == "Horário de descanso salvo e integrado ao WorkManager.") return "Horario de descanso guardado e integrado con WorkManager."
+        if (text.startsWith("Silenciado por ") && text.endsWith(" minutos.")) return text.replace("Silenciado por ", "Silenciado durante ").replace(" minutos.", " minutos.")
+        if (text.endsWith(" áudio(s) adicionado(s) à biblioteca.")) return text.replace(" áudio(s) adicionado(s) à biblioteca.", " elemento(s) de audio añadido(s) a la biblioteca.")
         if (text.startsWith("• ") && text.endsWith(" perfis importados")) return text.replace(" perfis importados", " perfiles importados")
         if (text.startsWith("• ") && text.endsWith(" referências de áudios importadas")) return text.replace(" referências de áudios importadas", " referencias de audio importadas")
         if (text == "Pesquisar áudios e lembretes...") return "Buscar audios y recordatorios..."
