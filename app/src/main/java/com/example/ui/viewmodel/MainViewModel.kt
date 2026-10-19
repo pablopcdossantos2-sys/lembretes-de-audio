@@ -309,10 +309,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 stopPreview()
                 val context = getApplication<Application>()
                 val uri = Uri.parse(audioItem.uriString)
-                val originalFile = AudioTrimmerUtil.resolveFileFromUri(context, uri)
+                val mimeType = if (uri.scheme == "content") context.contentResolver.getType(uri) else null
+                val pathExtension = if (uri.scheme == "file" || uri.scheme == null) {
+                    File(uri.path ?: "").extension.takeIf { it.isNotBlank() }
+                } else null
+                val mimeExtension = android.webkit.MimeTypeMap.getSingleton()
+                    .getExtensionFromMimeType(mimeType)
+                    ?.takeIf { it.isNotBlank() }
+                val isWavSource = pathExtension.equals("wav", ignoreCase = true) ||
+                    mimeType.equals("audio/wav", ignoreCase = true) ||
+                    mimeType.equals("audio/x-wav", ignoreCase = true) ||
+                    mimeExtension.equals("wav", ignoreCase = true)
+                // MediaMuxer writes MPEG-4/AAC for non-WAV inputs; do not label it .mp3/.ogg.
+                val ext = if (isWavSource) "wav" else "m4a"
 
                 val dir = File(context.filesDir, "audio_recordings").apply { mkdirs() }
-                val ext = originalFile?.extension?.ifBlank { "wav" } ?: if (audioItem.uriString.endsWith(".m4a")) "m4a" else "wav"
                 val trimmedFile = File(dir, "trimmed_${System.currentTimeMillis()}.$ext")
 
                 val success = AudioTrimmerUtil.trimAudio(

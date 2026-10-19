@@ -87,7 +87,8 @@ abstract class AppDatabase : RoomDatabase() {
                 populateInitialData(database, context)
                 if (context != null) {
                     try {
-                        com.example.service.AudioReminderService.startOrRefresh(context)
+                        // A inicialização do banco pode acontecer durante BOOT_COMPLETED.
+                        // Não inicie um foreground service a partir deste caminho de inicialização.
                         com.example.worker.ReminderWorkScheduler.rescheduleNextReminder(context)
                         com.example.util.AudioDiagnosticLogger.log(
                             level = com.example.util.DiagnosticLevel.INFO,

@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.data.preferences.UserPreferencesRepository
-import com.example.service.AudioReminderService
+import com.example.receiver.BootAndAlarmReceiver
 import com.example.util.AudioDiagnosticLogger
 import com.example.util.DiagnosticCategory
 import com.example.util.DiagnosticLevel
@@ -31,9 +31,8 @@ class AudioReminderWorker(
         return try {
             val prefs = UserPreferencesRepository(context).getPreferences()
             if (prefs.isAppMasterEnabled) {
-                // O serviço mantém a única cadeia responsável pela agenda; o Worker
-                // não toca áudio para evitar disparos duplicados e fora do intervalo.
-                AudioReminderService.startOrRefresh(context)
+                // Recalcula o próximo alarme sem iniciar um foreground service.
+                BootAndAlarmReceiver.rescheduleDirectAlarm(context)
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.WORKER,
@@ -41,6 +40,8 @@ class AudioReminderWorker(
                 )
             }
             Result.success()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             AudioDiagnosticLogger.log(
                 level = DiagnosticLevel.ERROR,

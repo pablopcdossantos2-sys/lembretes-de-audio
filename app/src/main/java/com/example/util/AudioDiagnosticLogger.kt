@@ -5,6 +5,10 @@ import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -74,6 +78,9 @@ object AudioDiagnosticLogger {
     val logsFlow: StateFlow<List<DiagnosticLogEntry>> = _logsFlow.asStateFlow()
 
     private val ioScope = CoroutineScope(Dispatchers.IO)
+    private val persistenceMutex = Mutex()
+    private val persistenceScheduleLock = Any()
+    private var persistenceJob: Job? = null
     private var appContext: Context? = null
     private var isInitialized = false
 
@@ -271,26 +278,32 @@ object AudioDiagnosticLogger {
 
     private fun persistLogsDebounced() {
         val ctx = appContext ?: return
-        ioScope.launch {
-            try {
-                val list = deque.take(150)
-                val jsonArray = JSONArray()
-                for (item in list) {
-                    val obj = JSONObject().apply {
-                        put("id", item.id)
-                        put("timestamp", item.timestamp)
-                        put("formattedTime", item.formattedTime)
-                        put("level", item.level.name)
-                        put("category", item.category.name)
-                        put("message", item.message)
-                        put("details", item.details ?: "")
+        synchronized(persistenceScheduleLock) {
+            persistenceJob?.cancel()
+            persistenceJob = ioScope.launch {
+                // Coalesce bursts of log messages into a single disk write.
+                delay(300L)
+                try {
+                    persistenceMutex.withLock {
+                        val list = deque.take(150)
+                        val jsonArray = JSONArray()
+                        for (item in list) {
+                            val obj = JSONObject().apply {
+                                put("id", item.id)
+                                put("timestamp", item.timestamp)
+                                put("formattedTime", item.formattedTime)
+                                put("level", item.level.name)
+                                put("category", item.category.name)
+                                put("message", item.message)
+                                put("details", item.details ?: "")
+                            }
+                            jsonArray.put(obj)
+                        }
+                        File(ctx.filesDir, LOGS_FILE_NAME).writeText(jsonArray.toString())
                     }
-                    jsonArray.put(obj)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not persist diagnostic logs", e)
                 }
-                val file = File(ctx.filesDir, LOGS_FILE_NAME)
-                file.writeText(jsonArray.toString())
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not persist diagnostic logs", e)
             }
         }
     }

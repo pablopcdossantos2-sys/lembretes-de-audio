@@ -341,72 +341,58 @@ object ScheduleCalculator {
 
             // Encontra todos os disparos candidatos de TODOS os perfis habilitados neste dia
             for (profile in enabledProfiles) {
-                if (!profile.daysOfWeek.contains(searchDate.dayOfWeek)) {
-                    continue
+                val windowStartDates = mutableListOf<java.time.LocalDate>()
+                if (profile.daysOfWeek.contains(searchDate.dayOfWeek)) {
+                    windowStartDates.add(searchDate)
                 }
 
-                val mergedRests = mergeRestingPeriods(profile.restingPeriods)
-                val startDateTime = ZonedDateTime.of(searchDate, profile.startTime, zone)
-                val endDateTime = if (profile.crossesMidnight) {
-                    ZonedDateTime.of(searchDate.plusDays(1), profile.endTime, zone)
-                } else {
-                    ZonedDateTime.of(searchDate, profile.endTime, zone)
+                // If this is today's date and the profile was enabled on yesterday's
+                // weekday, include the still-active overnight window from yesterday.
+                // This preserves 00:00–endTime triggers after the weekday boundary.
+                if (
+                    profile.crossesMidnight &&
+                    searchDate == now.toLocalDate() &&
+                    now.toLocalTime().isBefore(profile.endTime) &&
+                    profile.daysOfWeek.contains(searchDate.minusDays(1).dayOfWeek)
+                ) {
+                    windowStartDates.add(searchDate.minusDays(1))
                 }
 
-                var currentInstant = startDateTime
-                val stepMinutes = profile.intervalMinutes.toLong().coerceAtLeast(1L)
+                if (windowStartDates.isEmpty()) continue
 
-                while (!currentInstant.isAfter(endDateTime)) {
-                    // Fix A3: Apenas o perfil vencedor para este horário específico pode gerar o disparo
-                    val winningProfile = findActiveProfileFor(currentInstant, enabledProfiles)
-                    if (winningProfile?.id == profile.id && currentInstant.isAfter(effectiveStart)) {
-                        val time = currentInstant.toLocalTime()
+                for (windowStartDate in windowStartDates) {
+                    val mergedRests = mergeRestingPeriods(profile.restingPeriods)
+                    val startDateTime = ZonedDateTime.of(windowStartDate, profile.startTime, zone)
+                    val endDateTime = if (profile.crossesMidnight) {
+                        ZonedDateTime.of(windowStartDate.plusDays(1), profile.endTime, zone)
+                    } else {
+                        ZonedDateTime.of(windowStartDate, profile.endTime, zone)
+                    }
 
-                        // Fix A4: Checa se está no Horário Silencioso Global
-                        val isQuiet = isTimeInQuietHours(
-                            time = time,
-                            dayOfWeek = currentInstant.dayOfWeek,
-                            enabled = quietHoursEnabled,
-                            startHour = quietHoursStartHour,
-                            startMinute = quietHoursStartMinute,
-                            endHour = quietHoursEndHour,
-                            endMinute = quietHoursEndMinute,
-                            daysOfWeekCsv = quietHoursDaysCsv
-                        )
+                    var currentInstant = startDateTime
+                    val stepMinutes = profile.intervalMinutes.toLong().coerceAtLeast(1L)
 
-                        val coveringRest = findCoveringRest(time, mergedRests)
+                    while (!currentInstant.isAfter(endDateTime)) {
+                        // Fix A3: Apenas o perfil vencedor para este horário específico pode gerar o disparo
+                        val winningProfile = findActiveProfileFor(currentInstant, enabledProfiles)
+                        if (winningProfile?.id == profile.id && currentInstant.isAfter(effectiveStart)) {
+                            val time = currentInstant.toLocalTime()
 
-                        if (!isQuiet && coveringRest == null) {
-                            val (audioId, audioLabel, isRandom) = selectAudioForProfile(
-                                profile = profile,
-                                activeAudios = activeAudios,
-                                seqIndex = currentSeqIndex
+                            // Fix A4: Checa se está no Horário Silencioso Global
+                            val isQuiet = isTimeInQuietHours(
+                                time = time,
+                                dayOfWeek = currentInstant.dayOfWeek,
+                                enabled = quietHoursEnabled,
+                                startHour = quietHoursStartHour,
+                                startMinute = quietHoursStartMinute,
+                                endHour = quietHoursEndHour,
+                                endMinute = quietHoursEndMinute,
+                                daysOfWeekCsv = quietHoursDaysCsv
                             )
-                            candidatesForDay.add(
-                                ScheduledTrigger(
-                                    triggerTime = currentInstant,
-                                    profileId = profile.id,
-                                    profileName = profile.name,
-                                    predictedAudioId = audioId,
-                                    predictedAudioLabel = audioLabel,
-                                    isRandomAudio = isRandom
-                                )
-                            )
-                        } else if (!isQuiet && profile.resumePolicy == ResumePolicy.AT_REST_END && coveringRest != null) {
-                            val restEndInstant = if (coveringRest.crossesMidnight) {
-                                if (time.isBefore(coveringRest.endTime)) {
-                                    ZonedDateTime.of(currentInstant.toLocalDate(), coveringRest.endTime, zone)
-                                } else {
-                                    ZonedDateTime.of(currentInstant.toLocalDate().plusDays(1), coveringRest.endTime, zone)
-                                }
-                            } else {
-                                ZonedDateTime.of(currentInstant.toLocalDate(), coveringRest.endTime, zone)
-                            }
 
-                            if (restEndInstant.isAfter(effectiveStart) &&
-                                !restEndInstant.isAfter(endDateTime) &&
-                                !isTimeInRestingPeriod(restEndInstant.toLocalTime(), mergedRests)
-                            ) {
+                            val coveringRest = findCoveringRest(time, mergedRests)
+
+                            if (!isQuiet && coveringRest == null) {
                                 val (audioId, audioLabel, isRandom) = selectAudioForProfile(
                                     profile = profile,
                                     activeAudios = activeAudios,
@@ -414,7 +400,7 @@ object ScheduleCalculator {
                                 )
                                 candidatesForDay.add(
                                     ScheduledTrigger(
-                                        triggerTime = restEndInstant,
+                                        triggerTime = currentInstant,
                                         profileId = profile.id,
                                         profileName = profile.name,
                                         predictedAudioId = audioId,
@@ -422,11 +408,42 @@ object ScheduleCalculator {
                                         isRandomAudio = isRandom
                                     )
                                 )
+                            } else if (!isQuiet && profile.resumePolicy == ResumePolicy.AT_REST_END && coveringRest != null) {
+                                val restEndInstant = if (coveringRest.crossesMidnight) {
+                                    if (time.isBefore(coveringRest.endTime)) {
+                                        ZonedDateTime.of(currentInstant.toLocalDate(), coveringRest.endTime, zone)
+                                    } else {
+                                        ZonedDateTime.of(currentInstant.toLocalDate().plusDays(1), coveringRest.endTime, zone)
+                                    }
+                                } else {
+                                    ZonedDateTime.of(currentInstant.toLocalDate(), coveringRest.endTime, zone)
+                                }
+
+                                if (restEndInstant.isAfter(effectiveStart) &&
+                                    !restEndInstant.isAfter(endDateTime) &&
+                                    !isTimeInRestingPeriod(restEndInstant.toLocalTime(), mergedRests)
+                                ) {
+                                    val (audioId, audioLabel, isRandom) = selectAudioForProfile(
+                                        profile = profile,
+                                        activeAudios = activeAudios,
+                                        seqIndex = currentSeqIndex
+                                    )
+                                    candidatesForDay.add(
+                                        ScheduledTrigger(
+                                            triggerTime = restEndInstant,
+                                            profileId = profile.id,
+                                            profileName = profile.name,
+                                            predictedAudioId = audioId,
+                                            predictedAudioLabel = audioLabel,
+                                            isRandomAudio = isRandom
+                                        )
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    currentInstant = currentInstant.plusMinutes(stepMinutes)
+                        currentInstant = currentInstant.plusMinutes(stepMinutes)
+                    }
                 }
             }
 
