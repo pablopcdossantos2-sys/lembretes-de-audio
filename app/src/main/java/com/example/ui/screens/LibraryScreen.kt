@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.i18n.tr
+
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -165,7 +167,7 @@ fun LibraryScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("search_audio_field"),
-            placeholder = { Text("Pesquisar áudios e lembretes...") },
+            placeholder = { Text(tr("Pesquisar áudios e lembretes...")) },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = "Pesquisar")
             },
@@ -197,12 +199,12 @@ fun LibraryScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Biblioteca (${uiState.audios.size} áudios)",
+                        text = tr("Biblioteca (${uiState.audios.size} áudios)"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "$activeCount ativos",
+                        text = tr("$activeCount ativos"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
@@ -220,7 +222,7 @@ fun LibraryScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "$missingCount arquivo(s) inacessível(is)",
+                        text = tr("$missingCount arquivo(s) inacessível(is)"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -243,7 +245,7 @@ fun LibraryScreen(
                     ) {
                         Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Gravar", fontSize = 13.sp)
+                        Text(tr("Gravar"), fontSize = 13.sp)
                     }
 
                     FilledTonalButton(
@@ -255,7 +257,7 @@ fun LibraryScreen(
                     ) {
                         Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Importar", fontSize = 13.sp)
+                        Text(tr("Importar"), fontSize = 13.sp)
                     }
 
                     FilledTonalButton(
@@ -267,7 +269,7 @@ fun LibraryScreen(
                     ) {
                         Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Texto/Voz", fontSize = 13.sp)
+                        Text(tr("Texto/Voz"), fontSize = 13.sp)
                     }
                 }
             }
@@ -302,7 +304,7 @@ fun LibraryScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Grave sua voz com microfone, importe músicas/MP3 ou crie lembretes de texto falado.",
+                        text = tr("Grave sua voz com microfone, importe músicas/MP3 ou crie lembretes de texto falado."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         modifier = Modifier.padding(horizontal = 16.dp)
@@ -375,7 +377,7 @@ fun LibraryScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Reproduzindo prévia",
+                        text = tr("Reproduzindo prévia"),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                 )
@@ -452,8 +454,8 @@ fun LibraryScreen(
     audioToDelete?.let { audio ->
         AlertDialog(
             onDismissRequest = { audioToDelete = null },
-            title = { Text("Excluir Áudio") },
-            text = { Text("Deseja realmente remover \"${audio.label}\"? Ele deixará de ser tocado nos lembretes periódicos.") },
+            title = { Text(tr("Excluir Áudio")) },
+            text = { Text(tr("Deseja realmente remover \"${audio.label}\"? Ele deixará de ser tocado nos lembretes periódicos.")) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -462,12 +464,12 @@ fun LibraryScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Excluir")
+                    Text(tr("Excluir"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { audioToDelete = null }) {
-                    Text("Cancelar")
+                    Text(tr("Cancelar"))
                 }
             }
         )
@@ -573,7 +575,7 @@ fun AudioItemCard(
                             color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Text(
-                                text = "Vol: ${audio.volumePercent}%",
+                        text = tr("Vol: ${audio.volumePercent}%"),
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -585,7 +587,7 @@ fun AudioItemCard(
                             color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Text(
-                                text = "Peso: ${audio.weight}",
+                        text = tr("Peso: ${audio.weight}"),
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -614,7 +616,7 @@ fun AudioItemCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "\"${audio.ttsText}\"",
+                        text = tr("\"${audio.ttsText}\""),
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(8.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -637,7 +639,7 @@ fun AudioItemCard(
                     ) {
                         Icon(Icons.Default.ContentCut, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Aparar", fontSize = 12.sp)
+                        Text(tr("Aparar"), fontSize = 12.sp)
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
@@ -649,7 +651,7 @@ fun AudioItemCard(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Editar", fontSize = 12.sp)
+                    Text(tr("Editar"), fontSize = 12.sp)
                 }
 
                 Spacer(modifier = Modifier.width(6.dp))
@@ -661,7 +663,7 @@ fun AudioItemCard(
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Excluir", fontSize = 12.sp)
+                    Text(tr("Excluir"), fontSize = 12.sp)
                 }
             }
         }
@@ -685,13 +687,13 @@ fun EditAudioDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Editar Áudio") },
+        title = { Text(tr("Editar Áudio")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OutlinedTextField(
                     value = label,
                     onValueChange = { label = it },
-                    label = { Text("Nome / Rótulo") },
+                    label = { Text(tr("Nome / Rótulo")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -700,7 +702,7 @@ fun EditAudioDialog(
                     OutlinedTextField(
                         value = ttsText,
                         onValueChange = { ttsText = it },
-                        label = { Text("Texto a Falar") },
+                        label = { Text(tr("Texto a Falar")) },
                         minLines = 2,
                         maxLines = 4,
                         modifier = Modifier.fillMaxWidth()
@@ -712,8 +714,8 @@ fun EditAudioDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Volume do Item", style = MaterialTheme.typography.bodyMedium)
-                        Text("${volumePercent.toInt()}%", fontWeight = FontWeight.Bold)
+                        Text(tr("Volume do Item"), style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("${volumePercent.toInt()}%"), fontWeight = FontWeight.Bold)
                     }
                     Slider(
                         value = volumePercent,
@@ -727,8 +729,8 @@ fun EditAudioDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Peso na Sorteio Aleatório", style = MaterialTheme.typography.bodyMedium)
-                        Text("$weight", fontWeight = FontWeight.Bold)
+                        Text(tr("Peso na Sorteio Aleatório"), style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("$weight"), fontWeight = FontWeight.Bold)
                     }
                     Slider(
                         value = weight.toFloat(),
@@ -738,9 +740,8 @@ fun EditAudioDialog(
                     )
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Frequência de execução", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Define a frequência do perfil que agenda este lembrete.",
+                    Text(tr("Frequência de execução"), style = MaterialTheme.typography.bodyMedium)
+                    Text(tr("Define a frequência do perfil que agenda este lembrete."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -750,7 +751,7 @@ fun EditAudioDialog(
                                 FilterChip(
                                     selected = executionIntervalMinutes == minutes,
                                     onClick = { executionIntervalMinutes = minutes },
-                                    label = { Text("${minutes}m") },
+                                    label = { Text(tr("${minutes}m")) },
                                     modifier = Modifier.testTag("edit_audio_interval_${minutes}")
                                 )
                             }
@@ -769,7 +770,7 @@ fun EditAudioDialog(
                     ) {
                         Icon(Icons.Default.ContentCut, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Aparar Silêncio / Cortar Áudio", fontSize = 13.sp)
+                        Text(tr("Aparar Silêncio / Cortar Áudio"), fontSize = 13.sp)
                     }
                 }
             }
@@ -788,12 +789,12 @@ fun EditAudioDialog(
                     )
                 }
             ) {
-                Text("Salvar")
+                Text(tr("Salvar"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(tr("Cancelar"))
             }
         }
     )
@@ -811,11 +812,11 @@ fun CreateTtsAudioDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Novo Lembrete Falado (TTS)") },
+        title = { Text(tr("Novo Lembrete Falado (TTS)")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "A tecnologia Text-to-Speech do Android lerá este lembrete em voz alta nos horários programados.",
+                        text = tr("A tecnologia Text-to-Speech do Android lerá este lembrete em voz alta nos horários programados."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -823,8 +824,8 @@ fun CreateTtsAudioDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Título do Lembrete") },
-                    placeholder = { Text("Ex: Postura e Água") },
+                    label = { Text(tr("Título do Lembrete")) },
+                    placeholder = { Text(tr("Ex: Postura e Água")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -832,8 +833,8 @@ fun CreateTtsAudioDialog(
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text("Texto que o celular falará") },
-                    placeholder = { Text("Ex: Beba um copo de água e alongue-se.") },
+                    label = { Text(tr("Texto que o celular falará")) },
+                    placeholder = { Text(tr("Ex: Beba um copo de água e alongue-se.")) },
                     minLines = 3,
                     maxLines = 5,
                     modifier = Modifier.fillMaxWidth()
@@ -844,8 +845,8 @@ fun CreateTtsAudioDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Volume", style = MaterialTheme.typography.bodyMedium)
-                        Text("${volume.toInt()}%", fontWeight = FontWeight.Bold)
+                        Text(tr("Volume"), style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("${volume.toInt()}%"), fontWeight = FontWeight.Bold)
                     }
                     Slider(
                         value = volume,
@@ -864,12 +865,12 @@ fun CreateTtsAudioDialog(
                 },
                 enabled = title.isNotBlank() && text.isNotBlank()
             ) {
-                Text("Adicionar")
+                Text(tr("Adicionar"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(tr("Cancelar"))
             }
         }
     )
