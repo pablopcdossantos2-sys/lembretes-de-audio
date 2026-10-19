@@ -146,16 +146,16 @@ abstract class AppDatabase : RoomDatabase() {
             )
             profileDao.upsertProfileWithRests(weekend, emptyList())
 
-            // Perfil Rotina Diária (Todos os dias, 07:00 às 23:00, a cada 15 min, garantindo funcionamento contínuo)
+            // Perfil Rotina Diária (Todos os dias, 00:00 às 23:59, a cada 15 min, garantindo funcionamento contínuo)
             val daily = ProfileEntity(
                 name = "Rotina Diária",
                 isEnabled = true,
                 priority = 3,
                 daysOfWeekCsv = "1,2,3,4,5,6,7",
-                startHour = 7,
+                startHour = 0,
                 startMinute = 0,
                 endHour = 23,
-                endMinute = 0,
+                endMinute = 59,
                 intervalMinutes = 15,
                 playbackOrder = "SEQUENTIAL",
                 resumePolicy = "NEXT_GRID_MARK",

@@ -317,10 +317,6 @@ class AudioReminderService : Service() {
                         category = DiagnosticCategory.ROUTING,
                         message = "Disparo pausado: Chamada telefônica em andamento"
                     )
-                    showAlertNotification(
-                        title = "Lembrete pausado",
-                        message = "Chamada telefônica em andamento."
-                    )
                     refreshScheduleAndNotification()
                     return@launch
                 }
@@ -331,10 +327,6 @@ class AudioReminderService : Service() {
                         level = DiagnosticLevel.WARN,
                         category = DiagnosticCategory.ROUTING,
                         message = "Disparo silenciado: Modo Não Perturbe do sistema ativo"
-                    )
-                    showAlertNotification(
-                        title = "Lembrete silenciado",
-                        message = "Modo Não perturbe do sistema ativo."
                     )
                     refreshScheduleAndNotification()
                     return@launch

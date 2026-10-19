@@ -34,7 +34,7 @@ data class UserPreferences(
     val quietHoursEndHour: Int = 7,
     val quietHoursEndMinute: Int = 0,
     val quietHoursDaysCsv: String = "1,2,3,4,5,6,7",
-    val quietHoursNotifySilently: Boolean = true
+    val quietHoursNotifySilently: Boolean = false
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -79,7 +79,7 @@ class UserPreferencesRepository(private val context: Context) {
             quietHoursEndHour = prefs[Keys.QUIET_HOURS_END_HOUR] ?: 7,
             quietHoursEndMinute = prefs[Keys.QUIET_HOURS_END_MINUTE] ?: 0,
             quietHoursDaysCsv = prefs[Keys.QUIET_HOURS_DAYS_CSV] ?: "1,2,3,4,5,6,7",
-            quietHoursNotifySilently = prefs[Keys.QUIET_HOURS_NOTIFY_SILENTLY] ?: true
+            quietHoursNotifySilently = prefs[Keys.QUIET_HOURS_NOTIFY_SILENTLY] ?: false
         )
     }
 

@@ -2151,11 +2151,15 @@ fun DiagnosticsSettingsContent(
                     ) {
                         OutlinedButton(
                             onClick = {
-                                val text = viewModel.getDiagnosticLogsText()
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                val clip = ClipData.newPlainText("Logs de Diagnóstico", text)
-                                clipboard?.setPrimaryClip(clip)
-                                Toast.makeText(context, "Histórico de logs copiado para a área de transferência!", Toast.LENGTH_SHORT).show()
+                                try {
+                                    val text = viewModel.getDiagnosticLogsText()
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    val clip = ClipData.newPlainText("Logs de Diagnóstico", text)
+                                    clipboard?.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Histórico de logs copiado para a área de transferência!", Toast.LENGTH_SHORT).show()
+                                } catch (_: Throwable) {
+                                    Toast.makeText(context, "Não foi possível acessar a área de transferência.", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             modifier = Modifier
                                 .weight(1f)

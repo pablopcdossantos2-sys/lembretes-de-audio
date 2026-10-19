@@ -96,9 +96,10 @@ object DeviceStateHelper {
         return try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: return false
+                val devices = try { audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) } catch (_: Throwable) { null } ?: return false
                 devices.any { device ->
-                    val type = device.type
+                    if (device == null) return@any false
+                    val type = try { device.type } catch (_: Throwable) { -1 }
                     type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
                             type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
                             type == TYPE_BLE_HEADSET_VAL ||
@@ -107,7 +108,7 @@ object DeviceStateHelper {
                 }
             } else {
                 @Suppress("DEPRECATION")
-                audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+                try { audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn } catch (_: Throwable) { false }
             }
         } catch (_: Throwable) {
             false
@@ -118,9 +119,10 @@ object DeviceStateHelper {
         return try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: return false
+                val devices = try { audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS) } catch (_: Throwable) { null } ?: return false
                 devices.any { device ->
-                    val type = device.type
+                    if (device == null) return@any false
+                    val type = try { device.type } catch (_: Throwable) { -1 }
                     type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
                             type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
                             type == TYPE_BLE_HEADSET_VAL ||
@@ -132,7 +134,7 @@ object DeviceStateHelper {
                 }
             } else {
                 @Suppress("DEPRECATION")
-                audioManager.isWiredHeadsetOn || audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+                try { audioManager.isWiredHeadsetOn || audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn } catch (_: Throwable) { false }
             }
         } catch (_: Throwable) {
             false

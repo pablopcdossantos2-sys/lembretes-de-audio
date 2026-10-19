@@ -110,27 +110,13 @@ class AudioReminderWorker(
             Log.d(TAG, quietInfo)
 
             if (isQuietTime) {
-                Log.w(TAG, "[BLOQUEADO] Horário atual $timeSecondsStr está dentro do Não Perturbe global das preferências. Disparo cancelado.")
+                Log.w(TAG, "[BLOQUEADO] Horário atual $timeSecondsStr está dentro do Não Perturbe global das preferências. Disparo cancelado silenciosamente.")
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.WORKER,
                     message = "Disparo bloqueado: Modo Não Perturbe ativo ($timeSecondsStr)",
                     details = "Janela das %02d:%02d às %02d:%02d".format(prefs.quietHoursStartHour, prefs.quietHoursStartMinute, prefs.quietHoursEndHour, prefs.quietHoursEndMinute)
                 )
-
-                if (prefs.quietHoursNotifySilently) {
-                    showRestNotification(
-                        title = "Horário de Não Perturbe / Descanso",
-                        message = String.format(
-                            Locale.getDefault(),
-                            "Lembretes em áudio silenciados das %02d:%02d às %02d:%02d para garantir seu repouso.",
-                            prefs.quietHoursStartHour,
-                            prefs.quietHoursStartMinute,
-                            prefs.quietHoursEndHour,
-                            prefs.quietHoursEndMinute
-                        )
-                    )
-                }
                 return@withContext Result.success()
             }
         }
@@ -301,14 +287,12 @@ class AudioReminderWorker(
 
         // 3. VERIFICAÇÃO DE ESTADO DO DISPOSITIVO
         if (DeviceStateHelper.isPhoneCallActive(context)) {
-            Log.w(TAG, "[DISPOSITIVO] Chamada telefônica em andamento. Notificação e áudio adiados.")
-            showInfoNotification("Lembrete ignorado", "Chamada telefônica em andamento.")
+            Log.w(TAG, "[DISPOSITIVO] Chamada telefônica em andamento. Notificação e áudio adiados silenciosamente.")
             return@withContext Result.success()
         }
 
         if (prefs.respectDoNotDisturb && DeviceStateHelper.isDoNotDisturbActive(context)) {
             Log.w(TAG, "[DISPOSITIVO] Modo Não Perturbe do sistema ativo. Lembrete silenciado.")
-            showInfoNotification("Lembrete silenciado", "Modo Não Perturbe ativo no sistema.")
             return@withContext Result.success()
         }
 
