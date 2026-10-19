@@ -57,6 +57,9 @@ import com.example.ui.screens.ProfilesScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.AudioReminderTheme
 import com.example.ui.viewmodel.MainViewModel
+import androidx.compose.runtime.CompositionLocalProvider
+import com.example.ui.i18n.LocalAppLanguage
+import com.example.ui.i18n.tr
 
 enum class NavigationScreen(val title: String) {
     HOME("Início"),
@@ -146,13 +149,14 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isWideScreen = maxWidth > 600.dp
 
+        CompositionLocalProvider(LocalAppLanguage provides uiState.preferences.appLanguage) {
         Scaffold(
             topBar = {
                 if (currentScreen != NavigationScreen.RECORD) {
                     TopAppBar(
                         title = {
                             Text(
-                                text = currentScreen.title,
+                                text = tr(currentScreen.title),
                                 fontWeight = FontWeight.Bold
                             )
                         },
@@ -282,6 +286,7 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
                     }
                 }
             }
+        }
         }
     }
 }
