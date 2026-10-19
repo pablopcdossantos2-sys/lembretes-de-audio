@@ -173,36 +173,36 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
                         NavigationBarItem(
                             selected = currentScreen == NavigationScreen.HOME,
                             onClick = { currentScreen = NavigationScreen.HOME },
-                            icon = { Icon(Icons.Default.Home, contentDescription = "Início") },
-                            label = { Text("Início") },
+                            icon = { Icon(Icons.Default.Home, contentDescription = tr("Início")) },
+                            label = { Text(tr("Início")) },
                             modifier = Modifier.testTag("nav_item_home")
                         )
                         NavigationBarItem(
                             selected = currentScreen == NavigationScreen.RECORD,
                             onClick = { currentScreen = NavigationScreen.RECORD },
-                            icon = { Icon(Icons.Default.Mic, contentDescription = "Gravar Lembrete") },
-                            label = { Text("Gravar") },
+                            icon = { Icon(Icons.Default.Mic, contentDescription = tr("Gravar Lembrete")) },
+                            label = { Text(tr("Gravar")) },
                             modifier = Modifier.testTag("nav_item_record")
                         )
                         NavigationBarItem(
                             selected = currentScreen == NavigationScreen.LIBRARY,
                             onClick = { currentScreen = NavigationScreen.LIBRARY },
-                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Biblioteca") },
-                            label = { Text("Biblioteca") },
+                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = tr("Biblioteca")) },
+                            label = { Text(tr("Biblioteca")) },
                             modifier = Modifier.testTag("nav_item_library")
                         )
                         NavigationBarItem(
                             selected = currentScreen == NavigationScreen.PROFILES,
                             onClick = { currentScreen = NavigationScreen.PROFILES },
-                            icon = { Icon(Icons.Default.Schedule, contentDescription = "Perfis") },
-                            label = { Text("Perfis") },
+                            icon = { Icon(Icons.Default.Schedule, contentDescription = tr("Perfis")) },
+                            label = { Text(tr("Perfis")) },
                             modifier = Modifier.testTag("nav_item_profiles")
                         )
                         NavigationBarItem(
                             selected = currentScreen == NavigationScreen.SETTINGS,
                             onClick = { currentScreen = NavigationScreen.SETTINGS },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = "Configurações") },
-                            label = { Text("Config") },
+                            icon = { Icon(Icons.Default.Settings, contentDescription = tr("Configurações")) },
+                            label = { Text(tr("Config")) },
                             modifier = Modifier.testTag("nav_item_settings")
                         )
                     }
@@ -220,32 +220,32 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
                         NavigationRailItem(
                             selected = currentScreen == NavigationScreen.HOME,
                             onClick = { currentScreen = NavigationScreen.HOME },
-                            icon = { Icon(Icons.Default.Home, contentDescription = "Início") },
-                            label = { Text("Início") }
+                            icon = { Icon(Icons.Default.Home, contentDescription = tr("Início")) },
+                            label = { Text(tr("Início")) }
                         )
                         NavigationRailItem(
                             selected = currentScreen == NavigationScreen.RECORD,
                             onClick = { currentScreen = NavigationScreen.RECORD },
-                            icon = { Icon(Icons.Default.Mic, contentDescription = "Gravar Lembrete") },
-                            label = { Text("Gravar") }
+                            icon = { Icon(Icons.Default.Mic, contentDescription = tr("Gravar Lembrete")) },
+                            label = { Text(tr("Gravar")) }
                         )
                         NavigationRailItem(
                             selected = currentScreen == NavigationScreen.LIBRARY,
                             onClick = { currentScreen = NavigationScreen.LIBRARY },
-                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Biblioteca") },
-                            label = { Text("Biblioteca") }
+                            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = tr("Biblioteca")) },
+                            label = { Text(tr("Biblioteca")) }
                         )
                         NavigationRailItem(
                             selected = currentScreen == NavigationScreen.PROFILES,
                             onClick = { currentScreen = NavigationScreen.PROFILES },
-                            icon = { Icon(Icons.Default.Schedule, contentDescription = "Perfis") },
-                            label = { Text("Perfis") }
+                            icon = { Icon(Icons.Default.Schedule, contentDescription = tr("Perfis")) },
+                            label = { Text(tr("Perfis")) }
                         )
                         NavigationRailItem(
                             selected = currentScreen == NavigationScreen.SETTINGS,
                             onClick = { currentScreen = NavigationScreen.SETTINGS },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = "Configurações") },
-                            label = { Text("Config") }
+                            icon = { Icon(Icons.Default.Settings, contentDescription = tr("Configurações")) },
+                            label = { Text(tr("Config")) }
                         )
                     }
                 }
