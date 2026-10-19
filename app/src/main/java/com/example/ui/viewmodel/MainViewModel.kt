@@ -302,17 +302,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     item.profile.specificAudioId == null && item.profile.audioIdsCsv.isBlank()
                 }
                 val targets = (specificallyLinkedProfiles + sharedProfiles).distinctBy { it.profile.id }
+                val matchingReminders = database.reminderDao().getAllReminders().filter { reminder ->
+                    reminder.audioUri == audio.uriString
+                }
+                val clampedInterval = intervalMinutes.coerceIn(5, 120)
 
-                if (targets.isEmpty()) {
+                targets.forEach { item ->
+                    database.profileDao().updateProfile(item.profile.copy(intervalMinutes = clampedInterval))
+                }
+                matchingReminders.forEach { reminder ->
+                    database.reminderDao().updateReminder(reminder.copy(intervalMinutes = clampedInterval))
+                }
+
+                if (targets.isEmpty() && matchingReminders.isEmpty()) {
                     _userMessage.emit(
-                        "Áudio salvo. Não há perfil vinculado a este lembrete para alterar a frequência."
+                        "Áudio salvo. Não há perfil ou lembrete vinculado a este item para alterar a frequência."
                     )
                 } else {
-                    targets.forEach { item ->
-                        database.profileDao().updateProfile(item.profile.copy(intervalMinutes = intervalMinutes.coerceIn(5, 120)))
-                    }
                     _userMessage.emit(
-                        "Frequência atualizada para ${intervalMinutes.coerceIn(5, 120)} minutos nos perfis que executam este lembrete."
+                        "Frequência atualizada para $clampedInterval minutos nos perfis e lembretes vinculados."
                     )
                 }
             }
