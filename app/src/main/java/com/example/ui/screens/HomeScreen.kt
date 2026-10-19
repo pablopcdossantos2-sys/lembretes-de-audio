@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.i18n.tr
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -204,7 +206,7 @@ fun HomeScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Ouvir Disparo de Teste (Fones ou Alto-falante)", fontWeight = FontWeight.SemiBold)
+                        Text(tr("Ouvir Disparo de Teste (Fones ou Alto-falante)"), fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -231,7 +233,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Nenhum áudio ativo na biblioteca",
+                        text = tr("Nenhum áudio ativo na biblioteca"),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onErrorContainer
@@ -239,7 +241,7 @@ fun HomeScreen(
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "O app precisa de áudios adicionados por você para poder funcionar e tocar os lembretes.",
+                        text = tr("O app precisa de áudios adicionados por você para poder funcionar e tocar os lembretes."),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -253,7 +255,7 @@ fun HomeScreen(
                         ) {
                             Icon(Icons.Default.MusicNote, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Adicionar áudios agora")
+                            Text(tr("Adicionar áudios agora"))
                         }
                     }
                 }
@@ -285,13 +287,13 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Otimização de bateria ativa",
+                        text = tr("Otimização de bateria ativa"),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFF57F17)
                             )
                             Text(
-                                text = "O sistema pode atrasar ou bloquear áudios em repouso.",
+                        text = tr("O sistema pode atrasar ou bloquear áudios em repouso."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF5D4037)
                             )
@@ -300,7 +302,7 @@ fun HomeScreen(
                             onClick = onOpenBatteryDialog,
                             modifier = Modifier.testTag("fix_battery_button")
                         ) {
-                            Text("Ajustar")
+                            Text(tr("Ajustar"))
                         }
                     }
                 }
@@ -328,13 +330,13 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Permissão de alarme exato necessária",
+                        text = tr("Permissão de alarme exato necessária"),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFC62828)
                             )
                             Text(
-                                text = "Permita o agendamento de alarmes exatos nas configurações.",
+                        text = tr("Permita o agendamento de alarmes exatos nas configurações."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF5D4037)
                             )
@@ -356,7 +358,7 @@ fun HomeScreen(
                                 }
                             }
                         ) {
-                            Text("Permitir")
+                            Text(tr("Permitir"))
                         }
                     }
                 }
@@ -398,7 +400,7 @@ fun HomeScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Controle de Silêncio",
+                        text = tr("Controle de Silêncio"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -412,12 +414,12 @@ fun HomeScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = "Em pausa no momento",
+                        text = tr("Em pausa no momento"),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "Nenhum áudio tocará até o fim do período.",
+                        text = tr("Nenhum áudio tocará até o fim do período."),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -426,7 +428,7 @@ fun HomeScreen(
                                 onClick = { viewModel.resumeFromSnooze() },
                                 modifier = Modifier.testTag("resume_snooze_button")
                             ) {
-                                Text("Retomar agora")
+                                Text(tr("Retomar agora"))
                             }
                         }
                     } else {
@@ -440,19 +442,19 @@ fun HomeScreen(
                                     .weight(1f)
                                     .testTag("snooze_1h_button")
                             ) {
-                                Text("Silenciar 1h")
+                                Text(tr("Silenciar 1h"))
                             }
                             OutlinedButton(
                                 onClick = { viewModel.snooze(30) },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("30 min")
+                                Text(tr("30 min"))
                             }
                             OutlinedButton(
                                 onClick = { viewModel.snooze(120) },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("2 horas")
+                                Text(tr("2 horas"))
                             }
                         }
                     }
@@ -468,12 +470,12 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Próximos Disparos",
+                        text = tr("Próximos Disparos"),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "5 previstos",
+                        text = tr("5 previstos"),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -567,7 +569,7 @@ fun TriggerItemCard(trigger: ScheduledTrigger) {
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "${trigger.triggerTime.format(dateFormatter)} • Perfil: ${trigger.profileName}",
+                        text = tr("${trigger.triggerTime.format(dateFormatter)} • Perfil: ${trigger.profileName}"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -580,7 +582,7 @@ fun TriggerItemCard(trigger: ScheduledTrigger) {
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Text(
-                        text = "Aleatório",
+                        text = tr("Aleatório"),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         color = MaterialTheme.colorScheme.onSecondaryContainer
