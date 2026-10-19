@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.i18n.tr
+
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -220,7 +222,7 @@ fun RecordReminderScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Gravar Lembrete",
+                        text = tr("Gravar Lembrete"),
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -280,7 +282,7 @@ fun RecordReminderScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Permissão de Microfone Necessária",
+                        text = tr("Permissão de Microfone Necessária"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onErrorContainer
@@ -313,7 +315,7 @@ fun RecordReminderScreen(
                                     },
                                     modifier = Modifier.testTag("open_settings_permission_button")
                                 ) {
-                                    Text("Abrir Configurações")
+                                    Text(tr("Abrir Configurações"))
                                 }
                             }
                             Button(
@@ -322,7 +324,7 @@ fun RecordReminderScreen(
                                 },
                                 modifier = Modifier.testTag("request_permission_button")
                             ) {
-                                Text("Permitir Gravação")
+                                Text(tr("Permitir Gravação"))
                             }
                         }
                     }
@@ -420,7 +422,7 @@ fun RecordReminderScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Controles de Gravação",
+                        text = tr("Controles de Gravação"),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -583,7 +585,7 @@ fun RecordReminderScreen(
                                 ) {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Gravar Novamente")
+                                    Text(tr("Gravar Novamente"))
                                 }
 
                                 // Preview recorded audio
@@ -643,7 +645,7 @@ fun RecordReminderScreen(
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Text(
-                            text = "Detalhes do Lembrete",
+                        text = tr("Detalhes do Lembrete"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -651,7 +653,7 @@ fun RecordReminderScreen(
 
                         // 1. Vínculo ao Perfil de Usuário
                         Text(
-                            text = "Perfil de Usuário:",
+                        text = tr("Perfil de Usuário:"),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
@@ -663,7 +665,7 @@ fun RecordReminderScreen(
                             FilterChip(
                                 selected = selectedProfileId == null,
                                 onClick = { selectedProfileId = null },
-                                label = { Text("Novo Perfil Individual") },
+                                label = { Text(tr("Novo Perfil Individual")) },
                                 leadingIcon = if (selectedProfileId == null) {
                                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
                                 } else null,
@@ -690,8 +692,8 @@ fun RecordReminderScreen(
                         OutlinedTextField(
                             value = title,
                             onValueChange = { title = it },
-                            label = { Text("Título do Lembrete") },
-                            placeholder = { Text("Ex: Beber água, Tomar remédio") },
+                            label = { Text(tr("Título do Lembrete")) },
+                            placeholder = { Text(tr("Ex: Beber água, Tomar remédio")) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("reminder_title_input"),
@@ -701,7 +703,7 @@ fun RecordReminderScreen(
 
                         // 3. Periodicidade Individual
                         Text(
-                            text = "Periodicidade:",
+                        text = tr("Periodicidade:"),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
@@ -758,7 +760,7 @@ fun RecordReminderScreen(
                                         )
                                         Column {
                                             Text(
-                                                text = "Período de Descanso (Silêncio)",
+                        text = tr("Período de Descanso (Silêncio)"),
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -829,7 +831,7 @@ fun RecordReminderScreen(
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Text(
-                                            text = "Sem descanso programado. O lembrete tocará continuamente no intervalo selecionado a qualquer hora do dia ou da noite.",
+                        text = tr("Sem descanso programado. O lembrete tocará continuamente no intervalo selecionado a qualquer hora do dia ou da noite."),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                                             modifier = Modifier.padding(8.dp)
@@ -875,7 +877,7 @@ fun RecordReminderScreen(
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Salvar no Banco Local (Room)", fontWeight = FontWeight.Bold)
+                            Text(tr("Salvar no Banco Local (Room)"), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
