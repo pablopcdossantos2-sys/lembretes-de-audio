@@ -171,4 +171,39 @@ class BackupManagerTest {
         val importedReminder = targetDb.reminderDao().getAllReminders().single()
         assertFalse("Lembrete sem o arquivo local não deve ser ativado", importedReminder.isEnabled)
     }
+
+    @Test
+    fun `export and import restore recorded audio bytes in internal storage`() = runBlocking {
+        val testAudioFile = File(context.filesDir, "test_audio_record.wav").apply {
+            writeBytes("RIFF_WAV_SIMULATED_AUDIO_BYTES_FOR_BACKUP_TEST".toByteArray())
+        }
+        val audioId = sourceDb.audioDao().insertAudio(
+            AudioItemEntity(
+                uriString = "file://${testAudioFile.absolutePath}",
+                label = "Gravação de Voz",
+                audioType = "AUDIO_FILE",
+                isActive = true
+            )
+        )
+
+        val output = ByteArrayOutputStream()
+        assertTrue(BackupManager(context, sourceDb, prefs).exportConfig(output))
+
+        val exportedJson = JSONObject(output.toString(Charsets.UTF_8.name()))
+        val audiosArr = exportedJson.getJSONArray("audios")
+        assertEquals(1, audiosArr.length())
+        assertTrue(audiosArr.getJSONObject(0).has("audioBase64"))
+
+        val result = BackupManager(context, targetDb, prefs).importConfig(
+            ByteArrayInputStream(output.toByteArray())
+        )
+        assertTrue(result.message, result.success)
+
+        val importedAudio = targetDb.audioDao().getAllAudios().single()
+        assertTrue("Áudio restaurado deve ser mantido ativo", importedAudio.isActive)
+        assertTrue("URI do áudio restaurado deve apontar para arquivo válido", importedAudio.uriString.startsWith("file://"))
+        val restoredFile = File(importedAudio.uriString.removePrefix("file://"))
+        assertTrue("Arquivo físico restaurado deve existir", restoredFile.exists())
+        assertEquals("RIFF_WAV_SIMULATED_AUDIO_BYTES_FOR_BACKUP_TEST", restoredFile.readText())
+    }
 }

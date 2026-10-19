@@ -47,6 +47,12 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                         category = DiagnosticCategory.ALARM,
                         message = "Não foi possível iniciar o serviço para o alarme: ${e.message}"
                     )
+                    // Fallback visual de alta prioridade se o sistema operacional restringir o serviço
+                    ReminderNotificationHelper.showTriggerVisualAlert(
+                        context = context,
+                        title = "Lembrete Programado",
+                        message = "Horário do lembrete atingido. Toque para abrir."
+                    )
                 }
             }
 

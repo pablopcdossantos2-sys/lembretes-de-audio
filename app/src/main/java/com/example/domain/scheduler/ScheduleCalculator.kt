@@ -346,15 +346,13 @@ object ScheduleCalculator {
                     windowStartDates.add(searchDate)
                 }
 
-                // If this is today's date and the profile was enabled on yesterday's
-                // weekday, include the still-active overnight window from yesterday.
-                // This preserves 00:00–endTime triggers after the weekday boundary.
-                if (
-                    profile.crossesMidnight &&
-                    searchDate == now.toLocalDate() &&
-                    now.toLocalTime().isBefore(profile.endTime) &&
-                    profile.daysOfWeek.contains(searchDate.minusDays(1).dayOfWeek)
-                ) {
+                // Se o perfil cruza a meia-noite e estava ativo no dia anterior,
+                // inclui a janela noturna que se estende para a madrugada deste searchDate (inclusive em datas futuras).
+                val isYesterdayOvernightActive = profile.crossesMidnight &&
+                    profile.daysOfWeek.contains(searchDate.minusDays(1).dayOfWeek) &&
+                    (searchDate.isAfter(now.toLocalDate()) || now.toLocalTime().isBefore(profile.endTime))
+
+                if (isYesterdayOvernightActive) {
                     windowStartDates.add(searchDate.minusDays(1))
                 }
 
@@ -373,6 +371,13 @@ object ScheduleCalculator {
                     val stepMinutes = profile.intervalMinutes.toLong().coerceAtLeast(1L)
 
                     while (!currentInstant.isAfter(endDateTime)) {
+                        // Avalia estritamente os horários correspondentes a este searchDate,
+                        // evitando duplicar o processamento da madrugada no dia seguinte
+                        if (currentInstant.toLocalDate() != searchDate) {
+                            currentInstant = currentInstant.plusMinutes(stepMinutes)
+                            continue
+                        }
+
                         // Fix A3: Apenas o perfil vencedor para este horário específico pode gerar o disparo
                         val winningProfile = findActiveProfileFor(currentInstant, enabledProfiles)
                         if (winningProfile?.id == profile.id && currentInstant.isAfter(effectiveStart)) {

@@ -390,4 +390,46 @@ class ScheduleCalculatorTest {
         assertEquals(41L, triggers[0].profileId)
     }
 
+    @Test
+    fun nextTriggersIncludeFutureOvernightContinuationAfterMidnight() {
+        val zone = ZoneId.of("America/Sao_Paulo")
+        val fridayNightProfile = Profile(
+            id = 42L,
+            name = "Sexta Noturna Futura",
+            daysOfWeek = setOf(DayOfWeek.FRIDAY),
+            startTime = LocalTime.of(23, 0),
+            endTime = LocalTime.of(4, 0),
+            intervalMinutes = 60
+        )
+        // Começa em quinta-feira (15 de Outubro de 2026)
+        val thursdayNoon = ZonedDateTime.of(
+            LocalDate.of(2026, 10, 15),
+            LocalTime.of(12, 0),
+            zone
+        )
+
+        // Busca 5 disparos futuros a partir de quinta-feira
+        val triggers = ScheduleCalculator.getNextNTriggers(
+            now = thursdayNoon,
+            count = 5,
+            profiles = listOf(fridayNightProfile),
+            activeAudios = listOf(testAudio)
+        )
+
+        // Os disparos devem ser:
+        // 1: Sexta 23:00 (16/10)
+        // 2: Sábado 00:00 (17/10)
+        // 3: Sábado 01:00 (17/10)
+        // 4: Sábado 02:00 (17/10)
+        // 5: Sábado 03:00 (17/10)
+        assertEquals(5, triggers.size)
+        assertEquals(LocalDate.of(2026, 10, 16), triggers[0].triggerTime.toLocalDate())
+        assertEquals(LocalTime.of(23, 0), triggers[0].triggerTime.toLocalTime())
+        assertEquals(LocalDate.of(2026, 10, 17), triggers[1].triggerTime.toLocalDate())
+        assertEquals(LocalTime.of(0, 0), triggers[1].triggerTime.toLocalTime())
+        assertEquals(LocalDate.of(2026, 10, 17), triggers[2].triggerTime.toLocalDate())
+        assertEquals(LocalTime.of(1, 0), triggers[2].triggerTime.toLocalTime())
+    }
+
 }
+

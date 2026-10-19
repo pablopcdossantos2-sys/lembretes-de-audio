@@ -43,7 +43,8 @@ data class AudioBackupDto(
     val isActive: Boolean = true,
     val audioType: String = "AUDIO_FILE",
     val ttsText: String? = null,
-    val dateAdded: Long = 0L
+    val dateAdded: Long = 0L,
+    val audioBase64: String? = null
 )
 
 data class ReminderBackupDto(
@@ -60,7 +61,8 @@ data class ReminderBackupDto(
     val isEnabled: Boolean = true,
     val audioType: String = "TEXT_TO_SPEECH",
     val volumePercent: Int = 100,
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    val audioBase64: String? = null
 )
 
 data class PreferencesBackupDto(

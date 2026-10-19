@@ -46,6 +46,8 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
 
     private var previousAlarmVolume: Int? = null
     private var previousMusicVolume: Int? = null
+    private var currentVolumeFraction: Float = 1.0f
+    private var isPausedDueToAudioFocus: Boolean = false
 
     init {
         try {
@@ -108,7 +110,13 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     }
 
     private fun prepareAudioVolume(volumeFraction: Float, useAppVolumeOnly: Boolean, isHeadphones: Boolean) {
+        currentVolumeFraction = volumeFraction
         try {
+            if (useAppVolumeOnly) {
+                // Modo exclusivo de volume do aplicativo: preserva estritamente os volumes físicos do sistema
+                return
+            }
+
             // Unmute streams if currently muted
             try {
                 audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
@@ -123,11 +131,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             val minAudibleVol = (maxVol * 0.70f).toInt().coerceAtLeast(1)
             val desiredVol = (maxVol * volumeFraction).toInt().coerceIn(minAudibleVol, maxVol)
 
-            val shouldAdjust = if (useAppVolumeOnly) {
-                currentVol == 0 // Se estiver mudo no aparelho, força volume mínimo para permitir ouvir
-            } else {
-                currentVol < desiredVol || currentVol == 0
-            }
+            val shouldAdjust = currentVol < desiredVol || currentVol == 0
 
             if (shouldAdjust) {
                 if (previousMusicVolume == null) {
@@ -672,8 +676,45 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             textToSpeech?.stop()
         } catch (_: Exception) {}
 
+        isPausedDueToAudioFocus = false
         restoreSpeakerVolume()
         abandonAudioFocus()
+    }
+
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                Log.d(TAG, "Audio focus lost permanently - stopping playback")
+                stop()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                Log.d(TAG, "Audio focus lost transiently - pausing playback")
+                try {
+                    if (mediaPlayer?.isPlaying == true) {
+                        mediaPlayer?.pause()
+                        isPausedDueToAudioFocus = true
+                    }
+                } catch (_: Exception) {}
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                Log.d(TAG, "Audio focus ducking - lowering volume")
+                try {
+                    val duckVol = (currentVolumeFraction * 0.2f).coerceIn(0.05f, 0.3f)
+                    mediaPlayer?.setVolume(duckVol, duckVol)
+                } catch (_: Exception) {}
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                Log.d(TAG, "Audio focus gained - restoring volume and playback")
+                try {
+                    val targetVol = currentVolumeFraction.coerceIn(0.1f, 1.0f)
+                    mediaPlayer?.setVolume(targetVol, targetVol)
+                    if (isPausedDueToAudioFocus && mediaPlayer != null && mediaPlayer?.isPlaying == false) {
+                        mediaPlayer?.start()
+                        isPausedDueToAudioFocus = false
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     private fun requestAudioFocus(isHeadphones: Boolean = false) {
@@ -685,7 +726,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
-                .setOnAudioFocusChangeListener { /* handle if needed */ }
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
                 .build()
             audioFocusRequest = request
             try {
@@ -695,7 +736,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             @Suppress("DEPRECATION")
             try {
                 audioManager.requestAudioFocus(
-                    null,
+                    audioFocusChangeListener,
                     AudioManager.STREAM_MUSIC,
                     AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
                 )
@@ -706,9 +747,10 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     private fun abandonAudioFocus() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
         } else {
             @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(null)
+            audioManager.abandonAudioFocus(audioFocusChangeListener)
         }
     }
 

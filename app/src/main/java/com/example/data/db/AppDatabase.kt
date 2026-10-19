@@ -33,29 +33,42 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE `profiles` ADD COLUMN `fadeInOverrideEnabled` INTEGER NOT NULL DEFAULT 0")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE `profiles` ADD COLUMN `fadeInDurationSeconds` REAL NOT NULL DEFAULT 2.0")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE `profiles` ADD COLUMN `resumePolicy` TEXT NOT NULL DEFAULT 'NEXT_GRID_MARK'")
+                } catch (_: Exception) {}
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                val appContext = context.applicationContext
                 val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                    appContext,
                     AppDatabase::class.java,
                     "audio_reminders.db"
                 )
-                    // Never erase a user's reminders silently when a schema changes.
-                    // Add an explicit Room Migration before increasing the database version.
-                    .addCallback(DatabaseCallback())
+                    .addMigrations(MIGRATION_1_2)
+                    .addCallback(DatabaseCallback(appContext))
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
 
-        private class DatabaseCallback : RoomDatabase.Callback() {
+        private class DatabaseCallback(private val appContext: Context) : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                INSTANCE?.let { database ->
-                    CoroutineScope(Dispatchers.IO).launch {
-                        database.ensureInitialDataSeeded()
-                    }
+                CoroutineScope(Dispatchers.IO).launch {
+                    val database = getDatabase(appContext)
+                    ensureInitialDataSeeded(database, appContext)
                 }
             }
         }

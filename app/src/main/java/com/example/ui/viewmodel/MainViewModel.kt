@@ -97,14 +97,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     try {
                         val uri = Uri.parse(entity.uriString)
-                        if (uri.scheme == "file") {
-                            val file = java.io.File(uri.path ?: "")
-                            !file.exists() || !file.canRead()
-                        } else {
-                            val testStream = getApplication<Application>().contentResolver.openInputStream(uri)
-                            val accessible = testStream != null
-                            testStream?.close()
-                            !accessible
+                        when (uri.scheme) {
+                            "file" -> {
+                                val file = java.io.File(uri.path ?: "")
+                                !file.exists() || !file.canRead()
+                            }
+                            "content" -> {
+                                val resolver = getApplication<Application>().contentResolver
+                                val cursor = resolver.query(
+                                    uri,
+                                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                                    null,
+                                    null,
+                                    null
+                                )
+                                val accessible = cursor?.use { it.moveToFirst() } ?: false
+                                !accessible
+                            }
+                            else -> false
                         }
                     } catch (_: Exception) {
                         true

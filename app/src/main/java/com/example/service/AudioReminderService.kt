@@ -639,35 +639,53 @@ class AudioReminderService : Service() {
             AudioDiagnosticLogger.log(
                 level = DiagnosticLevel.WARN,
                 category = DiagnosticCategory.ALARM,
-                message = "Falha no agendamento exato, acionando fallback: ${e.message}",
+                message = "Falha no agendamento primário, acionando fallback prioritário: ${e.message}",
                 details = "Método tentado: $usedMethod"
             )
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.set(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerMillis,
-                        pendingIntent
-                    )
-                }
+                // Tenta prioritariamente AlarmClock (garante despertar e isenção de serviço em 1º plano no Android 12+)
+                val showIntent = PendingIntent.getActivity(
+                    this,
+                    2002,
+                    Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerMillis, showIntent)
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
                 AudioDiagnosticLogger.logAlarmScheduled(
                     triggerTimeStr = triggerTimeStr,
                     triggerMillis = triggerMillis,
-                    method = "setAndAllowWhileIdle (Aproximado)",
-                    canScheduleExact = false
+                    method = "setAlarmClock (Fallback Prioritário)",
+                    canScheduleExact = true
                 )
-            } catch (t: Throwable) {
-                AudioDiagnosticLogger.log(
-                    level = DiagnosticLevel.ERROR,
-                    category = DiagnosticCategory.ALARM,
-                    message = "Falha crítica ao agendar alarme no sistema: ${t.message}"
-                )
+            } catch (fallbackError: Throwable) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerMillis,
+                            pendingIntent
+                        )
+                    } else {
+                        alarmManager.set(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerMillis,
+                            pendingIntent
+                        )
+                    }
+                    AudioDiagnosticLogger.logAlarmScheduled(
+                        triggerTimeStr = triggerTimeStr,
+                        triggerMillis = triggerMillis,
+                        method = "setAndAllowWhileIdle (Aproximado)",
+                        canScheduleExact = false
+                    )
+                } catch (t: Throwable) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.ERROR,
+                        category = DiagnosticCategory.ALARM,
+                        message = "Falha crítica ao agendar alarme no sistema: ${t.message}"
+                    )
+                }
             }
         }
     }

@@ -112,6 +112,7 @@ class AudioRecorderHelper(private val context: Context) {
                 val byteBuffer = ByteArray(1024)
 
                 recordingJob = scope.launch {
+                    var lastVisualizerUpdate = 0L
                     try {
                         while (isActive && isRecording) {
                             if (isPaused) {
@@ -144,11 +145,16 @@ class AudioRecorderHelper(private val context: Context) {
                                 _currentAmplitude.value = maxAmp
 
                                 // 3. Compute real-time frequency spectrum & oscilloscope data
-                                val result = frequencyAnalyzer.analyze(shortBuffer, shortsRead)
-                                _frequencyData.value = result.frequencyBands
-                                _waveformData.value = result.waveformPoints
-                                _decibels.value = result.decibels
-                                _peakFrequencyHz.value = result.peakFrequencyHz
+                                // Throttle analysis to ~30 FPS (every 33ms) to eliminate GC churn and UI recomposition lag
+                                val nowTime = android.os.SystemClock.uptimeMillis()
+                                if (nowTime - lastVisualizerUpdate >= 33L) {
+                                    lastVisualizerUpdate = nowTime
+                                    val result = frequencyAnalyzer.analyze(shortBuffer, shortsRead)
+                                    _frequencyData.value = result.frequencyBands
+                                    _waveformData.value = result.waveformPoints
+                                    _decibels.value = result.decibels
+                                    _peakFrequencyHz.value = result.peakFrequencyHz
+                                }
                             }
                         }
                     } catch (e: Exception) {

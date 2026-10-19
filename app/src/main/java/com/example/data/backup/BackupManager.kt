@@ -87,6 +87,32 @@ class BackupManager(
 
             root.put("audios", JSONArray().apply {
                 database.audioDao().getAllAudios().forEach { audio ->
+                    val audioFilePath = if (audio.uriString.startsWith("file://")) {
+                        audio.uriString.removePrefix("file://")
+                    } else if (audio.uriString.startsWith("/")) {
+                        audio.uriString
+                    } else null
+
+                    val base64Data = audioFilePath?.let { path ->
+                        val f = File(path)
+                        if (f.isFile && f.length() in 1..(10 * 1024 * 1024)) {
+                            runCatching {
+                                android.util.Base64.encodeToString(f.readBytes(), android.util.Base64.NO_WRAP)
+                            }.getOrNull()
+                        } else null
+                    } ?: run {
+                        if (audio.uriString.startsWith("content://")) {
+                            runCatching {
+                                context.contentResolver.openInputStream(android.net.Uri.parse(audio.uriString))?.use { input ->
+                                    val bytes = input.readBytes()
+                                    if (bytes.size in 1..(10 * 1024 * 1024)) {
+                                        android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                                    } else null
+                                }
+                            }.getOrNull()
+                        } else null
+                    }
+
                     put(JSONObject().apply {
                         put("id", audio.id)
                         put("uriString", audio.uriString)
@@ -97,12 +123,37 @@ class BackupManager(
                         put("audioType", audio.audioType)
                         put("ttsText", audio.ttsText ?: JSONObject.NULL)
                         put("dateAdded", audio.dateAdded)
+                        if (base64Data != null) {
+                            put("audioBase64", base64Data)
+                        }
                     })
                 }
             })
 
             root.put("reminders", JSONArray().apply {
                 database.reminderDao().getAllReminders().forEach { reminder ->
+                    val remFilePath = reminder.audioFilePath?.takeIf {
+                        val f = File(it)
+                        f.isFile && f.length() in 1..(10 * 1024 * 1024)
+                    }
+                    val remBase64 = remFilePath?.let { path ->
+                        runCatching {
+                            android.util.Base64.encodeToString(File(path).readBytes(), android.util.Base64.NO_WRAP)
+                        }.getOrNull()
+                    } ?: run {
+                        val uriStr = reminder.audioUri
+                        if (uriStr != null && uriStr.startsWith("content://")) {
+                            runCatching {
+                                context.contentResolver.openInputStream(android.net.Uri.parse(uriStr))?.use { input ->
+                                    val bytes = input.readBytes()
+                                    if (bytes.size in 1..(10 * 1024 * 1024)) {
+                                        android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                                    } else null
+                                }
+                            }.getOrNull()
+                        } else null
+                    }
+
                     put(JSONObject().apply {
                         put("id", reminder.id)
                         put("profileId", reminder.profileId ?: JSONObject.NULL)
@@ -119,6 +170,9 @@ class BackupManager(
                         put("endMinute", reminder.endMinute)
                         put("daysOfWeekCsv", reminder.daysOfWeekCsv)
                         put("dateCreated", reminder.dateCreated)
+                        if (remBase64 != null) {
+                            put("audioBase64", remBase64)
+                        }
                     })
                 }
             })
@@ -162,15 +216,29 @@ class BackupManager(
                 for (i in 0 until audiosArray.length()) {
                     val item = audiosArray.getJSONObject(i)
                     val oldId = item.optLong("id", 0L)
-                    val uri = item.optString("uriString", "")
-                    val uriIsLocalFile = uri.startsWith("file://")
-                    val localFileAvailable = !uriIsLocalFile || runCatching {
-                        File(uri.removePrefix("file://")).exists()
-                    }.getOrDefault(false)
+                    val originalUri = item.optString("uriString", "")
+                    val audioBase64 = item.optNullableString("audioBase64")
                     val declaredType = item.optString("audioType", "AUDIO_FILE")
+
+                    val restoredUri = if (!audioBase64.isNullOrBlank()) {
+                        runCatching {
+                            val audioBytes = android.util.Base64.decode(audioBase64, android.util.Base64.DEFAULT)
+                            val ext = if (originalUri.endsWith(".m4a", ignoreCase = true) || declaredType == "AAC") "m4a" else "wav"
+                            val dir = File(context.filesDir, "audio_recordings").apply { mkdirs() }
+                            val restoredFile = File(dir, "rec_imported_${System.currentTimeMillis()}_$i.$ext")
+                            restoredFile.writeBytes(audioBytes)
+                            "file://${restoredFile.absolutePath}"
+                        }.getOrNull() ?: originalUri
+                    } else originalUri
+
+                    val uriIsLocalFile = restoredUri.startsWith("file://")
+                    val localFileAvailable = !uriIsLocalFile || runCatching {
+                        File(restoredUri.removePrefix("file://")).exists()
+                    }.getOrDefault(false)
+
                     val entity = AudioItemEntity(
                         id = 0L,
-                        uriString = uri,
+                        uriString = restoredUri,
                         label = item.optString("label", "Áudio"),
                         weight = item.optInt("weight", 3).coerceIn(1, 100),
                         volumePercent = item.optInt("volumePercent", 100).coerceIn(0, 100),
@@ -236,8 +304,22 @@ class BackupManager(
                     val item = remindersArray.getJSONObject(i)
                     val oldProfileId = item.optLongOrNull("profileId")
                     val newProfileId = oldProfileId?.let { profileIdMap[it] }
-                    val audioFilePath = item.optNullableString("audioFilePath")
-                    val audioUri = item.optNullableString("audioUri")
+                    var audioFilePath = item.optNullableString("audioFilePath")
+                    var audioUri = item.optNullableString("audioUri")
+                    val reminderAudioBase64 = item.optNullableString("audioBase64")
+
+                    if (!reminderAudioBase64.isNullOrBlank()) {
+                        runCatching {
+                            val remBytes = android.util.Base64.decode(reminderAudioBase64, android.util.Base64.DEFAULT)
+                            val ext = if (audioFilePath?.endsWith(".m4a", ignoreCase = true) == true) "m4a" else "wav"
+                            val dir = File(context.filesDir, "audio_recordings").apply { mkdirs() }
+                            val restoredRemFile = File(dir, "rem_imported_${System.currentTimeMillis()}_$i.$ext")
+                            restoredRemFile.writeBytes(remBytes)
+                            audioFilePath = restoredRemFile.absolutePath
+                            audioUri = "file://${restoredRemFile.absolutePath}"
+                        }
+                    }
+
                     val localAudioFilesAvailable =
                         (audioFilePath == null || localFileExists(audioFilePath)) &&
                             (audioUri == null || !audioUri.startsWith("file://") || localFileExists(audioUri))
