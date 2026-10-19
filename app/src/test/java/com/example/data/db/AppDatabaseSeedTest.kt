@@ -45,7 +45,7 @@ class AppDatabaseSeedTest {
         AppDatabase.ensureInitialDataSeeded(database)
 
         assertEquals(1, database.audioDao().getAllAudios().size)
-        assertEquals(3, database.profileDao().getAllProfilesWithRests().size)
+        assertEquals(1, database.profileDao().getAllProfilesWithRests().size)
     }
 
     @Test
@@ -58,6 +58,20 @@ class AppDatabaseSeedTest {
         AppDatabase.ensureInitialDataSeeded(database)
 
         assertEquals(1, database.profileDao().getAllProfilesWithRests().size)
-        assertEquals(3, database.audioDao().getAllAudios().size)
+        assertEquals(1, database.audioDao().getAllAudios().size)
+    } 
+    @Test
+    fun `fresh database receives only one demo profile and one demo audio`() = runBlocking {
+        AppDatabase.ensureInitialDataSeeded(database)
+
+        val profiles = database.profileDao().getAllProfilesWithRests()
+        val audios = database.audioDao().getAllAudios()
+
+        assertEquals(1, profiles.size)
+        assertEquals(1, audios.size)
+        assertEquals("Perfil de Demonstração", profiles.single().profile.name)
+        assertEquals(15, profiles.single().profile.intervalMinutes)
+        assertEquals("Hora de Beber Água", audios.single().label)
     }
+
 }
