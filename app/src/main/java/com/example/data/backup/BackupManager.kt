@@ -258,31 +258,40 @@ class BackupManager(
                 }
             }
 
-            // Preferences use DataStore, so apply them after the Room transaction commits.
+            // DataStore and Room cannot share a transaction. A preferences failure must
+            // therefore be reported as a warning, not as a rolled-back database import.
+            var preferencesWarning = false
             if (prefsObject != null) {
-                prefsRepo.setAppMasterEnabled(prefsObject.optBoolean("isAppMasterEnabled", false))
-                prefsRepo.setMasterVolumePercent(prefsObject.optInt("masterVolumePercent", 100))
-                prefsRepo.setUseAppVolumeOnly(prefsObject.optBoolean("useAppVolumeOnly", false))
-                prefsRepo.setFadeInEnabled(prefsObject.optBoolean("fadeInEnabled", true))
-                prefsRepo.setFadeInDurationSeconds(prefsObject.optDouble("fadeInDurationSeconds", 2.0).toFloat())
-                prefsRepo.setVibrateWithAudio(prefsObject.optBoolean("vibrateWithAudio", true))
-                prefsRepo.setShowLabelInNotification(prefsObject.optBoolean("showLabelInNotification", true))
-                prefsRepo.setRespectDoNotDisturb(prefsObject.optBoolean("respectDoNotDisturb", true))
-                prefsRepo.setDefaultResumePolicy(prefsObject.optString("defaultResumePolicy", "NEXT_GRID_MARK"))
-                prefsRepo.setQuietHours(
-                    enabled = prefsObject.optBoolean("quietHoursEnabled", false),
-                    startHour = prefsObject.optInt("quietHoursStartHour", 22),
-                    startMinute = prefsObject.optInt("quietHoursStartMinute", 0),
-                    endHour = prefsObject.optInt("quietHoursEndHour", 7),
-                    endMinute = prefsObject.optInt("quietHoursEndMinute", 0),
-                    daysCsv = prefsObject.optString("quietHoursDaysCsv", "1,2,3,4,5,6,7"),
-                    notifySilently = prefsObject.optBoolean("quietHoursNotifySilently", false)
-                )
+                try {
+                    prefsRepo.setAppMasterEnabled(prefsObject.optBoolean("isAppMasterEnabled", false))
+                    prefsRepo.setMasterVolumePercent(prefsObject.optInt("masterVolumePercent", 100))
+                    prefsRepo.setUseAppVolumeOnly(prefsObject.optBoolean("useAppVolumeOnly", false))
+                    prefsRepo.setFadeInEnabled(prefsObject.optBoolean("fadeInEnabled", true))
+                    prefsRepo.setFadeInDurationSeconds(prefsObject.optDouble("fadeInDurationSeconds", 2.0).toFloat())
+                    prefsRepo.setVibrateWithAudio(prefsObject.optBoolean("vibrateWithAudio", true))
+                    prefsRepo.setShowLabelInNotification(prefsObject.optBoolean("showLabelInNotification", true))
+                    prefsRepo.setRespectDoNotDisturb(prefsObject.optBoolean("respectDoNotDisturb", true))
+                    prefsRepo.setDefaultResumePolicy(prefsObject.optString("defaultResumePolicy", "NEXT_GRID_MARK"))
+                    prefsRepo.setQuietHours(
+                        enabled = prefsObject.optBoolean("quietHoursEnabled", false),
+                        startHour = prefsObject.optInt("quietHoursStartHour", 22),
+                        startMinute = prefsObject.optInt("quietHoursStartMinute", 0),
+                        endHour = prefsObject.optInt("quietHoursEndHour", 7),
+                        endMinute = prefsObject.optInt("quietHoursEndMinute", 0),
+                        daysCsv = prefsObject.optString("quietHoursDaysCsv", "1,2,3,4,5,6,7"),
+                        notifySilently = prefsObject.optBoolean("quietHoursNotifySilently", false)
+                    )
+                } catch (_: Exception) {
+                    preferencesWarning = true
+                }
             }
 
+            val warningText = if (preferencesWarning) {
+                " Os dados foram importados, mas algumas preferências não puderam ser restauradas."
+            } else ""
             ImportResult(
                 success = true,
-                message = "Backup restaurado: $importedProfiles perfis, $importedAudios áudios e $importedReminders lembretes importados. Áudios locais ausentes foram desativados.",
+                message = "Backup restaurado: $importedProfiles perfis, $importedAudios áudios e $importedReminders lembretes importados. Áudios locais ausentes foram desativados.$warningText",
                 importedProfilesCount = importedProfiles,
                 importedAudiosCount = importedAudios
             )
