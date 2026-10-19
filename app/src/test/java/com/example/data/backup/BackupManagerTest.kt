@@ -87,6 +87,15 @@ class BackupManagerTest {
             )
         )
 
+        // Pre-existing rows force the restore to generate different IDs.
+        targetDb.audioDao().insertAudio(
+            AudioItemEntity(uriString = "tts:existing", label = "Já existente", audioType = "TEXT_TO_SPEECH")
+        )
+        targetDb.profileDao().upsertProfileWithRests(
+            ProfileEntity(name = "Perfil já existente"),
+            emptyList()
+        )
+
         val output = ByteArrayOutputStream()
         assertTrue(BackupManager(context, sourceDb, prefs).exportConfig(output))
 
@@ -98,8 +107,9 @@ class BackupManagerTest {
         assertEquals(1, result.importedAudiosCount)
         assertEquals(1, result.importedProfilesCount)
 
-        val importedAudio = targetDb.audioDao().getAllAudios().single()
-        val importedProfile = targetDb.profileDao().getAllProfilesWithRests().single()
+        val importedAudio = targetDb.audioDao().getAllAudios().single { it.label == "Áudio de teste" }
+        val importedProfile = targetDb.profileDao().getAllProfilesWithRests()
+            .single { it.profile.name == "Perfil de teste" }
         val importedReminder = targetDb.reminderDao().getAllReminders().single()
 
         assertEquals(importedAudio.id, importedProfile.profile.specificAudioId)
