@@ -68,6 +68,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val diagnosticLogs = com.example.util.AudioDiagnosticLogger.logsFlow
 
+    fun setAppLanguage(language: String) {
+        viewModelScope.launch { prefsRepo.setAppLanguage(language) }
+    }
+
     fun clearDiagnosticLogs() {
         com.example.util.AudioDiagnosticLogger.clearLogs()
     }
