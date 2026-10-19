@@ -83,6 +83,19 @@ import com.example.domain.model.AudioType
 import com.example.ui.viewmodel.MainUiState
 import com.example.ui.viewmodel.MainViewModel
 
+private fun intervalMinutesForAudio(audio: AudioItem, profiles: List<com.example.domain.model.Profile>): Int {
+    val specificallyLinked = profiles.firstOrNull { profile ->
+        profile.specificAudioId == audio.id || audio.id in profile.audioIds
+    }
+    val sharedProfile = profiles.firstOrNull { profile ->
+        profile.specificAudioId == null && profile.audioIds.isEmpty()
+    }
+    return (specificallyLinked ?: sharedProfile ?: profiles.firstOrNull())
+        ?.intervalMinutes
+        ?.coerceIn(5, 120)
+        ?: 15
+}
+
 @Composable
 fun LibraryScreen(
     uiState: MainUiState,
@@ -397,9 +410,10 @@ fun LibraryScreen(
     editingAudio?.let { audio ->
         EditAudioDialog(
             audio = audio,
+            intervalMinutes = intervalMinutesForAudio(audio, uiState.profiles),
             onDismiss = { editingAudio = null },
-            onSave = { updated ->
-                viewModel.updateAudio(updated)
+            onSave = { updated, intervalMinutes ->
+                viewModel.updateAudio(updated, intervalMinutes)
                 editingAudio = null
             },
             onOpenTrimmer = if (audio.audioType != AudioType.TEXT_TO_SPEECH) {
@@ -657,14 +671,17 @@ fun AudioItemCard(
 @Composable
 fun EditAudioDialog(
     audio: AudioItem,
+    intervalMinutes: Int = 15,
     onDismiss: () -> Unit,
-    onSave: (AudioItem) -> Unit,
+    onSave: (AudioItem, Int) -> Unit,
     onOpenTrimmer: (() -> Unit)? = null
 ) {
-    var label by remember { mutableStateOf(audio.label) }
-    var volumePercent by remember { mutableFloatStateOf(audio.volumePercent.toFloat()) }
-    var weight by remember { mutableIntStateOf(audio.weight) }
-    var ttsText by remember { mutableStateOf(audio.ttsText ?: "") }
+    var label by remember(audio.id) { mutableStateOf(audio.label) }
+    var volumePercent by remember(audio.id) { mutableFloatStateOf(audio.volumePercent.toFloat()) }
+    var weight by remember(audio.id) { mutableIntStateOf(audio.weight) }
+    var ttsText by remember(audio.id) { mutableStateOf(audio.ttsText ?: "") }
+    var executionIntervalMinutes by remember(audio.id, intervalMinutes) { mutableIntStateOf(intervalMinutes) }
+    val executionIntervals = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -720,6 +737,27 @@ fun EditAudioDialog(
                         steps = 3
                     )
                 }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Frequência de execução", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Define a frequência do perfil que agenda este lembrete.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    executionIntervals.chunked(5).forEach { intervalRow ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            intervalRow.forEach { minutes ->
+                                FilterChip(
+                                    selected = executionIntervalMinutes == minutes,
+                                    onClick = { executionIntervalMinutes = minutes },
+                                    label = { Text("${minutes}m") },
+                                    modifier = Modifier.testTag("edit_audio_interval_${minutes}")
+                                )
+                            }
+                        }
+                    }
+                }
+
 
                 if (audio.audioType != AudioType.TEXT_TO_SPEECH && onOpenTrimmer != null) {
                     OutlinedButton(
@@ -745,7 +783,8 @@ fun EditAudioDialog(
                             volumePercent = volumePercent.toInt(),
                             weight = weight,
                             ttsText = if (audio.audioType == AudioType.TEXT_TO_SPEECH) ttsText else audio.ttsText
-                        )
+                        ),
+                        executionIntervalMinutes
                     )
                 }
             ) {
