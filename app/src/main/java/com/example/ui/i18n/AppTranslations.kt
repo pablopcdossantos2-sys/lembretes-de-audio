@@ -19,6 +19,8 @@ private val english = mapOf(
     "Áudio e Geral" to "Audio & General",
     "Diagnósticos" to "Diagnostics",
     "Idioma da aplicação" to "App language",
+    "Ex: Postura e Água" to "E.g. posture and water",
+    "Aumenta o volume gradualmente neste perfil" to "Gradually increases volume for this profile",
     "Backup processado com sucesso!" to "Backup processed successfully!",
     "OK" to "OK",
     "Inicia o áudio baixo e aumenta suavemente" to "Starts audio quietly and gradually raises the volume",
@@ -193,6 +195,8 @@ private val spanish = mapOf(
     "Áudio e Geral" to "Audio y general",
     "Diagnósticos" to "Diagnósticos",
     "Idioma da aplicação" to "Idioma de la aplicación",
+    "Ex: Postura e Água" to "Ej.: postura y agua",
+    "Aumenta o volume gradualmente neste perfil" to "Aumenta gradualmente el volumen en este perfil",
     "Backup processado com sucesso!" to "¡Copia de seguridad procesada correctamente!",
     "OK" to "OK",
     "Inicia o áudio baixo e aumenta suavemente" to "Inicia el audio a bajo volumen y lo aumenta gradualmente",
@@ -367,6 +371,7 @@ private fun dynamicTranslation(text: String, language: String): String {
         if (text.startsWith("• ") && text.endsWith(" referências de áudios importadas")) return text.replace(" referências de áudios importadas", " audio references imported")
         if (text == "Pesquisar áudios e lembretes...") return "Search audio and reminders..."
         if (text == "2 horas") return "2 hours"
+        if (text.startsWith("Deseja realmente remover ")) return text.replace("Deseja realmente remover ", "Really delete ").replace("? Ele deixará de ser tocado nos lembretes periódicos.", "? It will no longer play as a periodic reminder.").replace("? Todos os horários e períodos de descanso associados serão excluídos.", "? All associated schedules and rest periods will be deleted.")
         if (text.startsWith("Frequência atualizada para ")) return text.replace("Frequência atualizada para ", "Frequency updated to ").replace(" minutos nos perfis e lembretes vinculados.", " minutes for linked profiles and reminders.")
         if (text.startsWith("Áudio salvo.")) return text.replace("Áudio salvo.", "Audio saved.").replace("Não há perfil ou lembrete vinculado a este item para alterar a frequência.", "No profile or reminder is linked to this item, so its frequency cannot be changed.")
         if (text.startsWith("Lembrete \"") && text.endsWith("\" adicionado com sucesso.")) return text.replace("Lembrete \"", "Reminder \"").replace("\" adicionado com sucesso.", "\" added successfully.")
@@ -374,6 +379,7 @@ private fun dynamicTranslation(text: String, language: String): String {
         if (text.startsWith("• ") && text.endsWith(" perfis importados")) return text.replace(" perfis importados", " perfiles importados")
         if (text.startsWith("• ") && text.endsWith(" referências de áudios importadas")) return text.replace(" referências de áudios importadas", " referencias de audio importadas")
         if (text == "Pesquisar áudios e lembretes...") return "Buscar audios y recordatorios..."
+        if (text.startsWith("Deseja realmente remover ")) return text.replace("Deseja realmente remover ", "¿Eliminar realmente ").replace("? Ele deixará de ser tocado nos lembretes periódicos.", "? Ya no se reproducirá en los recordatorios periódicos.").replace("? Todos os horários e períodos de descanso associados serão excluídos.", "? Se eliminarán todos los horarios y períodos de descanso asociados.")
         if (text.startsWith("Frequência atualizada para ")) return text.replace("Frequência atualizada para ", "Frecuencia actualizada a ").replace(" minutos nos perfis e lembretes vinculados.", " minutos en los perfiles y recordatorios vinculados.")
         if (text.startsWith("Áudio salvo.")) return text.replace("Áudio salvo.", "Audio guardado.").replace("Não há perfil ou lembrete vinculado a este item para alterar a frequência.", "No hay ningún perfil o recordatorio vinculado a este elemento para cambiar la frecuencia.")
         if (text.startsWith("Lembrete \"") && text.endsWith("\" adicionado com sucesso.")) return text.replace("Lembrete \"", "Recordatorio \"").replace("\" adicionado com sucesso.", "\" añadido correctamente.")
