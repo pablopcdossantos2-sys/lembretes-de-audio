@@ -82,7 +82,7 @@ abstract class AppDatabase : RoomDatabase() {
             val existingProfiles = profileDao.getAllProfilesWithRests()
             val existingAudios = audioDao.getAllAudios()
 
-            if (existingProfiles.isEmpty() || existingAudios.isEmpty()) {
+            if (existingProfiles.isEmpty() && existingAudios.isEmpty()) {
                 populateInitialData(database, context)
                 if (context != null) {
                     try {
