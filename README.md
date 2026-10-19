@@ -38,6 +38,12 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
 
 ---
 
+## Idiomas da Interface
+
+A interface oferece seleção de idioma entre **português do Brasil (PT-BR), inglês e espanhol**. A escolha é armazenada localmente nas preferências do aplicativo.
+
+---
+
 ## Arquitetura do Projeto
 
 - **Linguagem:** Kotlin
