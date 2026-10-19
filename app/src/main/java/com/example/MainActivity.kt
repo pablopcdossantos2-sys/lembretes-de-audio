@@ -60,6 +60,7 @@ import com.example.ui.viewmodel.MainViewModel
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.ui.i18n.LocalAppLanguage
 import com.example.ui.i18n.tr
+import com.example.ui.i18n.translateText
 
 enum class NavigationScreen(val title: String) {
     HOME("Início"),
@@ -105,9 +106,9 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Observe user messages from ViewModel
-    LaunchedEffect(Unit) {
+    LaunchedEffect(uiState.preferences.appLanguage) {
         viewModel.userMessage.collect { message ->
-            snackbarHostState.showSnackbar(message)
+            snackbarHostState.showSnackbar(translateText(message, uiState.preferences.appLanguage))
         }
     }
 
