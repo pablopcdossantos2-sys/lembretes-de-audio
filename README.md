@@ -22,7 +22,7 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
 2. **Biblioteca de Áudios Completa:**
    - **Gravação de Áudio com Microfone:** Gravador integrado com visualizador de onda em tempo real, temporizador, pause/resume e reprodução de prévia.
    - **Importação de Arquivos:** Suporte a arquivos locais (MP3, WAV, M4A, OGG) via seletor de arquivos do sistema.
-   - **Texto para Fala (TTS):** Síntese de voz nativa do Android (Text-to-Speech) em Português do Brasil.
+   - **Texto para Fala (TTS):** Síntese de voz nativa do Android (Text-to-Speech); vozes e idiomas disponíveis dependem da configuração do dispositivo.
    - Controle individual de volume (0 a 100%) e peso no sorteio para cada áudio.
 
 3. **Arquitetura e Robustez em Segundo Plano:**
