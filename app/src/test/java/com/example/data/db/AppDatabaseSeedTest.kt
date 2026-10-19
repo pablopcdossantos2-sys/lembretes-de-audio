@@ -63,6 +63,7 @@ class AppDatabaseSeedTest {
     @Test
     fun `fresh database receives only one demo profile and one demo audio`() = runBlocking {
         AppDatabase.ensureInitialDataSeeded(database)
+        AppDatabase.ensureInitialDataSeeded(database)
 
         val profiles = database.profileDao().getAllProfilesWithRests()
         val audios = database.audioDao().getAllAudios()
