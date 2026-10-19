@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.ui.i18n.tr
+
 import android.media.MediaPlayer
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -223,7 +225,7 @@ fun AudioTrimmerDialog(
                 }
                 Column {
                     Text(
-                        text = "Aparar Áudio / Silêncio",
+                        text = tr("Aparar Áudio / Silêncio"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -252,7 +254,7 @@ fun AudioTrimmerDialog(
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(36.dp))
                         Text(
-                            text = "Analisando forma de onda e silêncio...",
+                        text = tr("Analisando forma de onda e silêncio..."),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -297,7 +299,7 @@ fun AudioTrimmerDialog(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
                                             Text(
-                                                text = "Silêncio Detectado!",
+                        text = tr("Silêncio Detectado!"),
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -324,7 +326,7 @@ fun AudioTrimmerDialog(
                                             containerColor = MaterialTheme.colorScheme.tertiary
                                         )
                                     ) {
-                                        Text("Aplicar", fontSize = 12.sp)
+                                        Text(tr("Aplicar"), fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -440,13 +442,13 @@ fun AudioTrimmerDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Início: ${AudioTrimmerUtil.formatTimeMs(startTrimMs)}",
+                        text = tr("Início: ${AudioTrimmerUtil.formatTimeMs(startTrimMs)}"),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Fim: ${AudioTrimmerUtil.formatTimeMs(endTrimMs)}",
+                        text = tr("Fim: ${AudioTrimmerUtil.formatTimeMs(endTrimMs)}"),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
@@ -476,18 +478,18 @@ fun AudioTrimmerDialog(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Corte início: -${AudioTrimmerUtil.formatTimeMs(cutStartDuration)}",
+                        text = tr("Corte início: -${AudioTrimmerUtil.formatTimeMs(cutStartDuration)}"),
                                 fontSize = 11.sp,
                                 color = if (cutStartDuration > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "Duração útil: ${AudioTrimmerUtil.formatTimeMs(trimmedDuration)}",
+                        text = tr("Duração útil: ${AudioTrimmerUtil.formatTimeMs(trimmedDuration)}"),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Corte fim: -${AudioTrimmerUtil.formatTimeMs(cutEndDuration)}",
+                        text = tr("Corte fim: -${AudioTrimmerUtil.formatTimeMs(cutEndDuration)}"),
                                 fontSize = 11.sp,
                                 color = if (cutEndDuration > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -508,7 +510,7 @@ fun AudioTrimmerDialog(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("-0.1s Início", fontSize = 11.sp)
+                            Text(tr("-0.1s Início"), fontSize = 11.sp)
                         }
 
                         OutlinedButton(
@@ -519,7 +521,7 @@ fun AudioTrimmerDialog(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("+0.1s Início", fontSize = 11.sp)
+                            Text(tr("+0.1s Início"), fontSize = 11.sp)
                         }
 
                         OutlinedButton(
@@ -565,7 +567,7 @@ fun AudioTrimmerDialog(
                     ) {
                         Column {
                             Text(
-                                text = "Substituir áudio original",
+                        text = tr("Substituir áudio original"),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -608,7 +610,7 @@ fun AudioTrimmerDialog(
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Salvar Corte")
+                Text(tr("Salvar Corte"))
             }
         },
         dismissButton = {
@@ -619,7 +621,7 @@ fun AudioTrimmerDialog(
                 },
                 enabled = !isTrimming
             ) {
-                Text("Cancelar")
+                Text(tr("Cancelar"))
             }
         }
     )
