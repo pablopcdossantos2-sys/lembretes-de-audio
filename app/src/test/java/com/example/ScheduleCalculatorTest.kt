@@ -359,4 +359,35 @@ class ScheduleCalculatorTest {
         )
         assertFalse("Quando desativado, nunca deve bloquear disparos", isQuiet)
     }
+    @Test
+    fun nextTriggersIncludeOvernightContinuationAfterMidnight() {
+        val zone = ZoneId.of("America/Sao_Paulo")
+        val fridayNightProfile = Profile(
+            id = 41L,
+            name = "Sexta à noite",
+            daysOfWeek = setOf(DayOfWeek.FRIDAY),
+            startTime = LocalTime.of(22, 0),
+            endTime = LocalTime.of(6, 0),
+            intervalMinutes = 60
+        )
+        val saturdayAfterMidnight = ZonedDateTime.of(
+            LocalDate.of(2026, 10, 17),
+            LocalTime.of(0, 30),
+            zone
+        )
+
+        val triggers = ScheduleCalculator.getNextNTriggers(
+            now = saturdayAfterMidnight,
+            count = 2,
+            profiles = listOf(fridayNightProfile),
+            activeAudios = listOf(testAudio)
+        )
+
+        assertEquals(2, triggers.size)
+        assertEquals(LocalDate.of(2026, 10, 17), triggers[0].triggerTime.toLocalDate())
+        assertEquals(LocalTime.of(1, 0), triggers[0].triggerTime.toLocalTime())
+        assertEquals(LocalTime.of(2, 0), triggers[1].triggerTime.toLocalTime())
+        assertEquals(41L, triggers[0].profileId)
+    }
+
 }

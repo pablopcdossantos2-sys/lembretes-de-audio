@@ -499,6 +499,7 @@ fun RecordReminderScreen(
                                 Button(
                                     onClick = {
                                         recorderHelper.stopRecording()
+                                        currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
                                         recordingStatus = RecordingStatus.FINISHED
                                     },
                                     modifier = Modifier
@@ -547,6 +548,7 @@ fun RecordReminderScreen(
                                 Button(
                                     onClick = {
                                         recorderHelper.stopRecording()
+                                        currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
                                         recordingStatus = RecordingStatus.FINISHED
                                     },
                                     modifier = Modifier

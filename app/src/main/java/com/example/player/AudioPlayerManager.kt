@@ -560,13 +560,13 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
 
             // Fallback via ToneGenerator se não for possível abrir o arquivo
             scope.launch(Dispatchers.IO) {
+                var toneGen: ToneGenerator? = null
                 try {
                     val stream = AudioManager.STREAM_MUSIC
                     val volPercent = (volumeFraction * 100).toInt().coerceIn(75, 100)
-                    val toneGen = ToneGenerator(stream, volPercent)
+                    toneGen = ToneGenerator(stream, volPercent)
                     toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 900)
                     delay(1000L)
-                    toneGen.release()
                     AudioDiagnosticLogger.log(
                         level = DiagnosticLevel.SUCCESS,
                         category = DiagnosticCategory.PLAYBACK,
@@ -576,6 +576,9 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 } catch (e: Exception) {
                     Log.e(TAG, "Fallback tone error", e)
                 } finally {
+                    try { toneGen?.release() } catch (releaseError: Exception) {
+                        Log.w(TAG, "Could not release fallback ToneGenerator", releaseError)
+                    }
                     mainHandler.post {
                         restoreSpeakerVolume()
                         abandonAudioFocus()

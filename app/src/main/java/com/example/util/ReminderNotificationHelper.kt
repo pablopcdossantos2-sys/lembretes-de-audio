@@ -146,8 +146,7 @@ object ReminderNotificationHelper {
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)
                 .setContentIntent(openPendingIntent)
-                // FullScreenIntent para heads-up e ativação imediata na tela de bloqueio
-                .setFullScreenIntent(openPendingIntent, true)
+                // Mantém alerta heads-up via canal de alta importância sem interromper a tela do usuário.
                 .setVibrate(longArrayOf(0, 450, 200, 450))
                 .setLights(Color.CYAN, 1000, 500)
                 .addAction(android.R.drawable.ic_media_pause, "⏹ Parar Áudio", stopPendingIntent)

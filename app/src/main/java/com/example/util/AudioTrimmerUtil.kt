@@ -239,21 +239,32 @@ object AudioTrimmerUtil {
     ): Boolean = withContext(Dispatchers.IO) {
         val uri = Uri.parse(sourceUriString)
         val file = resolveFileFromUri(context, uri)
+            ?: (if (uri.scheme == "content") copyContentUriToCache(context, uri) else null)
+            ?: return@withContext false
+        if (!file.exists()) return@withContext false
 
-        val isWav = (file?.name?.endsWith(".wav", ignoreCase = true) == true) || sourceUriString.endsWith(".wav", ignoreCase = true)
+        val isTemporaryContentCopy = uri.scheme == "content" &&
+            file.name.startsWith("audio_trim_source_") &&
+            file.parentFile?.absolutePath == context.cacheDir.absolutePath
 
-        if (isWav && file != null && file.exists()) {
-            val success = trimWavFile(file, startMs, endMs, outputFile)
-            if (success) return@withContext true
-        }
+        try {
+            val isWav = file.name.endsWith(".wav", ignoreCase = true) ||
+                sourceUriString.endsWith(".wav", ignoreCase = true)
 
-        // If not WAV or WAV trim failed, attempt MediaExtractor + MediaMuxer
-        if (file != null && file.exists()) {
+            if (isWav) {
+                val success = trimWavFile(file, startMs, endMs, outputFile)
+                if (success) return@withContext true
+            }
+
+            // MediaExtractor needs a readable local path; content:// sources are
+            // copied to cache by resolveFileFromUri before this call.
             val success = trimM4aFile(file.absolutePath, startMs * 1000L, endMs * 1000L, outputFile)
-            if (success) return@withContext true
+            success
+        } finally {
+            if (isTemporaryContentCopy) {
+                file.delete()
+            }
         }
-
-        false
     }
 
     private fun trimWavFile(sourceWav: File, startMs: Long, endMs: Long, outputFile: File): Boolean {
@@ -456,11 +467,40 @@ object AudioTrimmerUtil {
     }
 
     fun resolveFileFromUri(context: Context, uri: Uri): File? {
-        return if (uri.scheme == null || uri.scheme == "file") {
+        if (uri.scheme == null || uri.scheme == "file") {
             val path = uri.path ?: uri.toString()
-            File(path)
-        } else {
-            // Check if it's cached in filesDir
+            return File(path)
+        }
+        // UI preview can pass content:// directly to MediaPlayer; do not create a
+        // temporary copy here because callers may not own its lifecycle.
+        return null
+    }
+
+    private fun copyContentUriToCache(context: Context, uri: Uri): File? {
+        var tempFile: File? = null
+        return try {
+            val mimeType = context.contentResolver.getType(uri)
+            val extension = android.webkit.MimeTypeMap.getSingleton()
+                .getExtensionFromMimeType(mimeType)
+                ?.takeIf { it.isNotBlank() }
+                ?: when (mimeType?.lowercase()) {
+                    "audio/wav", "audio/x-wav" -> "wav"
+                    "audio/mp4", "audio/m4a", "audio/aac" -> "m4a"
+                    else -> "bin"
+                }
+            val createdFile = File.createTempFile("audio_trim_source_", ".$extension", context.cacheDir)
+            tempFile = createdFile
+            val input = context.contentResolver.openInputStream(uri)
+            if (input == null) {
+                createdFile.delete()
+                return null
+            }
+            input.use { source ->
+                createdFile.outputStream().use { target -> source.copyTo(target) }
+            }
+            createdFile
+        } catch (_: Exception) {
+            tempFile?.delete()
             null
         }
     }

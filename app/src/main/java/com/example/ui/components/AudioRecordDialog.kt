@@ -301,6 +301,7 @@ private fun RecordingActiveDialog(
                             } else {
                                 // Stop recording
                                 val stopped = recorder.stopRecording()
+                                recordedFile = recorder.getCurrentOutputFile() ?: recordedFile
                                 isRecording = false
                                 if (!stopped) {
                                     errorMessage = "Erro ao finalizar a gravação."

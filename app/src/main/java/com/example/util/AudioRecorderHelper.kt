@@ -172,6 +172,16 @@ class AudioRecorderHelper(private val context: Context) {
 
     private fun startFallbackMediaRecorder(outputFile: File): Boolean {
         return try {
+            // MediaRecorder com MPEG_4/AAC produz container MP4, não WAV.
+            val fallbackOutputFile = if (outputFile.extension.equals("wav", ignoreCase = true)) {
+                File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.m4a")
+            } else {
+                outputFile
+            }
+            fallbackOutputFile.parentFile?.mkdirs()
+            fallbackOutputFile.delete()
+            currentOutputFile = fallbackOutputFile
+
             val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 MediaRecorder(context)
             } else {
@@ -185,7 +195,7 @@ class AudioRecorderHelper(private val context: Context) {
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                 setAudioEncodingBitRate(128000)
                 setAudioSamplingRate(SAMPLE_RATE)
-                setOutputFile(outputFile.absolutePath)
+                setOutputFile(fallbackOutputFile.absolutePath)
                 prepare()
                 start()
             }
@@ -287,6 +297,9 @@ class AudioRecorderHelper(private val context: Context) {
     fun getMaxAmplitude(): Int {
         return _currentAmplitude.value
     }
+
+    /** Retorna o arquivo real, inclusive quando a gravação precisou usar fallback AAC/M4A. */
+    fun getCurrentOutputFile(): File? = currentOutputFile
 
     fun createDefaultOutputFile(): File {
         val dir = File(context.filesDir, "lembretes_audio").apply { mkdirs() }
