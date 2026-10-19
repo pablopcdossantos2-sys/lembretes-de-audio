@@ -68,7 +68,7 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                         val snoozeUntil = System.currentTimeMillis() + (10 * 60 * 1000L)
                         prefsRepo.setSnoozeUntilEpochMillis(snoozeUntil)
                         // Recalcula o alarme sem iniciar um foreground service a partir do receiver.
-                        rescheduleDirectAlarm(context)
+                        BootAndAlarmReceiver.rescheduleDirectAlarm(context)
                         AudioDiagnosticLogger.logServiceEvent("ACTION_SNOOZE_10_MIN_ALERT", "Modo soneca de 10 minutos ativado")
                     } catch (e: Throwable) {
                         AudioDiagnosticLogger.log(
@@ -98,7 +98,7 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                         database.ensureInitialDataSeeded(context)
                         val prefs = prefsRepo.getPreferences()
                         if (prefs.isAppMasterEnabled) {
-                            rescheduleDirectAlarm(context)
+                            BootAndAlarmReceiver.rescheduleDirectAlarm(context)
                             // No boot, apenas reagenda. O serviço de mediaPlayback será
                             // iniciado quando o alarme disparar ou o usuário abrir o app.
                             com.example.worker.ReminderWorkScheduler.scheduleWorkBasedOnActiveSettings(context)
