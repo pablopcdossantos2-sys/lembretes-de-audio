@@ -211,13 +211,13 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Permissão de Alarme Exato Necessária",
+                        text = tr("Permissão de Alarme Exato Necessária"),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             Text(
-                                text = "No Android 12+, autorize 'Alarmes e lembretes' para disparos pontuais.",
+                        text = tr("No Android 12+, autorize 'Alarmes e lembretes' para disparos pontuais."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -229,7 +229,7 @@ fun SettingsScreen(
                             onClick = { showExactAlarmDialog = true },
                             modifier = Modifier.testTag("btn_banner_exact_alarm_info")
                         ) {
-                            Text("Ajuda", color = MaterialTheme.colorScheme.onErrorContainer)
+                            Text(tr("Ajuda"), color = MaterialTheme.colorScheme.onErrorContainer)
                         }
                         Button(
                             onClick = { viewModel.openExactAlarmSettings() },
@@ -238,7 +238,7 @@ fun SettingsScreen(
                             ),
                             modifier = Modifier.testTag("request_exact_alarm_permission_button")
                         ) {
-                            Text("Permitir")
+                            Text(tr("Permitir"))
                         }
                     }
                 }
@@ -253,21 +253,21 @@ fun SettingsScreen(
             Tab(
                 selected = selectedSettingsTab == 0,
                 onClick = { selectedSettingsTab = 0 },
-                text = { Text("Descanso") },
+                text = { Text(tr("Descanso")) },
                 icon = { Icon(Icons.Default.Bedtime, contentDescription = null) },
                 modifier = Modifier.testTag("tab_quiet_hours")
             )
             Tab(
                 selected = selectedSettingsTab == 1,
                 onClick = { selectedSettingsTab = 1 },
-                text = { Text("Áudio e Geral") },
+                text = { Text(tr("Áudio e Geral")) },
                 icon = { Icon(Icons.Default.Tune, contentDescription = null) },
                 modifier = Modifier.testTag("tab_general_audio")
             )
             Tab(
                 selected = selectedSettingsTab == 2,
                 onClick = { selectedSettingsTab = 2 },
-                text = { Text("Diagnósticos") },
+                text = { Text(tr("Diagnósticos")) },
                 icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
                 modifier = Modifier.testTag("tab_diagnostics")
             )
@@ -397,16 +397,16 @@ fun SettingsScreen(
             text = {
                 Column {
                     if (result.success) {
-                        Text("Backup processado com sucesso!")
+                        Text(tr("Backup processado com sucesso!"))
                         if (result.profilesImported > 0 || result.audiosImported > 0) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("• ${result.profilesImported} perfis importados")
-                            Text("• ${result.audiosImported} referências de áudios importadas")
+                            Text(tr("• ${result.profilesImported} perfis importados"))
+                            Text(tr("• ${result.audiosImported} referências de áudios importadas"))
                         }
                         if (result.missingAudioLabels.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Atenção: Os seguintes áudios não foram encontrados no aparelho e precisarão ser reassociados na biblioteca:\n- ${result.missingAudioLabels.joinToString("\n- ")}",
+                        text = tr("Atenção: Os seguintes áudios não foram encontrados no aparelho e precisarão ser reassociados na biblioteca:\n- ${result.missingAudioLabels.joinToString(")\n- ")}",
                                 color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -418,7 +418,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 Button(onClick = { importResultDialog = null }) {
-                    Text("OK")
+                    Text(tr("OK"))
                 }
             }
         )
@@ -562,12 +562,12 @@ fun QuietHoursSettingsContent(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "Não Perturbe Programado",
+                        text = tr("Não Perturbe Programado"),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Silencia o áudio dos lembretes durante o repouso",
+                        text = tr("Silencia o áudio dos lembretes durante o repouso"),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -589,7 +589,7 @@ fun QuietHoursSettingsContent(
 
                             // Seletor Interativo de Horários (Início e Fim)
                             Text(
-                                text = "Janela de Descanso Diária",
+                        text = tr("Janela de Descanso Diária"),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -611,7 +611,7 @@ fun QuietHoursSettingsContent(
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         Text(
-                                            text = "Início do Repouso",
+                        text = tr("Início do Repouso"),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -636,7 +636,7 @@ fun QuietHoursSettingsContent(
                                             )
                                         }
                                         Text(
-                                            text = "Toque para alterar",
+                        text = tr("Toque para alterar"),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.primary
                                         )
@@ -656,7 +656,7 @@ fun QuietHoursSettingsContent(
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
                                         Text(
-                                            text = "Término do Repouso",
+                        text = tr("Término do Repouso"),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -681,7 +681,7 @@ fun QuietHoursSettingsContent(
                                             )
                                         }
                                         Text(
-                                            text = "Toque para alterar",
+                        text = tr("Toque para alterar"),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.secondary
                                         )
@@ -691,7 +691,7 @@ fun QuietHoursSettingsContent(
 
                             // Presets Rápidos
                             Text(
-                                text = "Predefinições Rápidas",
+                        text = tr("Predefinições Rápidas"),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -717,7 +717,7 @@ fun QuietHoursSettingsContent(
                                         .testTag("preset_night"),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Noite (22h-7h)", style = MaterialTheme.typography.labelSmall)
+                                    Text(tr("Noite (22h-7h)"), style = MaterialTheme.typography.labelSmall)
                                 }
 
                                 OutlinedButton(
@@ -737,7 +737,7 @@ fun QuietHoursSettingsContent(
                                         .testTag("preset_dawn"),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Madrugada (0h-8h)", style = MaterialTheme.typography.labelSmall)
+                                    Text(tr("Madrugada (0h-8h)"), style = MaterialTheme.typography.labelSmall)
                                 }
 
                                 OutlinedButton(
@@ -757,7 +757,7 @@ fun QuietHoursSettingsContent(
                                         .testTag("preset_lunch"),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Almoço (12h-13h30)", style = MaterialTheme.typography.labelSmall)
+                                    Text(tr("Almoço (12h-13h30)"), style = MaterialTheme.typography.labelSmall)
                                 }
                             }
 
@@ -765,7 +765,7 @@ fun QuietHoursSettingsContent(
 
                             // Dias da Semana Ativos
                             Text(
-                                text = "Dias em que o Não Perturbe se Aplica",
+                        text = tr("Dias em que o Não Perturbe se Aplica"),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -832,7 +832,7 @@ fun QuietHoursSettingsContent(
                                         )
                                     }
                                 ) {
-                                    Text("Todos os dias")
+                                    Text(tr("Todos os dias"))
                                 }
 
                                 TextButton(
@@ -848,7 +848,7 @@ fun QuietHoursSettingsContent(
                                         )
                                     }
                                 ) {
-                                    Text("Seg a Sex")
+                                    Text(tr("Seg a Sex"))
                                 }
 
                                 TextButton(
@@ -864,7 +864,7 @@ fun QuietHoursSettingsContent(
                                         )
                                     }
                                 ) {
-                                    Text("Fins de semana")
+                                    Text(tr("Fins de semana"))
                                 }
                             }
 
@@ -877,9 +877,9 @@ fun QuietHoursSettingsContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("Notificação silenciosa de aviso", fontWeight = FontWeight.SemiBold)
+                                    Text(tr("Notificação silenciosa de aviso"), fontWeight = FontWeight.SemiBold)
                                     Text(
-                                        text = "Informa discretamente no painel do Android que o lembrete foi pausado para descanso",
+                        text = tr("Informa discretamente no painel do Android que o lembrete foi pausado para descanso"),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -926,14 +926,14 @@ fun QuietHoursSettingsContent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Integração com Android WorkManager",
+                        text = tr("Integração com Android WorkManager"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
                     Text(
-                        text = "O WorkManager é o mecanismo nativo do Android que executa as tarefas periódicas em segundo plano. Sempre que um disparo ocorre, o WorkManager consulta as configurações de descanso acima e o banco Room antes de reproduzir áudio.",
+                        text = tr("O WorkManager é o mecanismo nativo do Android que executa as tarefas periódicas em segundo plano. Sempre que um disparo ocorre, o WorkManager consulta as configurações de descanso acima e o banco Room antes de reproduzir áudio."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -948,7 +948,7 @@ fun QuietHoursSettingsContent(
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
-                                text = "Sincronizado com WorkManager",
+                        text = tr("Sincronizado com WorkManager"),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -961,7 +961,7 @@ fun QuietHoursSettingsContent(
                             color = MaterialTheme.colorScheme.secondaryContainer
                         ) {
                             Text(
-                                text = "Intervalo Mínimo: 15 min",
+                        text = tr("Intervalo Mínimo: 15 min"),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -986,7 +986,7 @@ fun QuietHoursSettingsContent(
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Disparar Verificação do WorkManager Agora")
+                        Text(tr("Disparar Verificação do WorkManager Agora"))
                     }
                 }
             }
@@ -1014,14 +1014,14 @@ fun QuietHoursSettingsContent(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Descansos por Perfil (Banco Room)",
+                        text = tr("Descansos por Perfil (Banco Room)"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
                     Text(
-                        text = "Além do horário geral de Não Perturbe, cada perfil no banco de dados Room pode ter janelas específicas de descanso (ex: almoço, reuniões ou turnos).",
+                        text = tr("Além do horário geral de Não Perturbe, cada perfil no banco de dados Room pode ter janelas específicas de descanso (ex: almoço, reuniões ou turnos)."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1033,7 +1033,7 @@ fun QuietHoursSettingsContent(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Nenhum descanso específico cadastrado nos perfis. O agendamento segue o Não Perturbe geral.",
+                        text = tr("Nenhum descanso específico cadastrado nos perfis. O agendamento segue o Não Perturbe geral."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(12.dp)
@@ -1060,7 +1060,7 @@ fun QuietHoursSettingsContent(
                                                     fontWeight = FontWeight.Bold
                                                 )
                                                 Text(
-                                                    text = "Perfil: ${profile.name}",
+                        text = tr("Perfil: ${profile.name}"),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -1131,7 +1131,7 @@ fun GeneralSettingsContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Volume e Áudio", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(tr("Volume e Áudio"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
                     // Master Volume
@@ -1140,8 +1140,8 @@ fun GeneralSettingsContent(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Volume Geral do App")
-                            Text("${prefs.masterVolumePercent}%", fontWeight = FontWeight.Bold)
+                            Text(tr("Volume Geral do App"))
+                            Text(tr("${prefs.masterVolumePercent}%"), fontWeight = FontWeight.Bold)
                         }
                         Slider(
                             value = prefs.masterVolumePercent.toFloat(),
@@ -1152,20 +1152,20 @@ fun GeneralSettingsContent(
 
                     // Volume Source
                     Column {
-                        Text("Fonte de Volume", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(tr("Fonte de Volume"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(
                                 selected = !prefs.useAppVolumeOnly,
                                 onClick = { viewModel.updatePreferences(useAppVolumeOnly = false) }
                             )
-                            Text("Usar volume de mídia do sistema", style = MaterialTheme.typography.bodySmall)
+                            Text(tr("Usar volume de mídia do sistema"), style = MaterialTheme.typography.bodySmall)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(
                                 selected = prefs.useAppVolumeOnly,
                                 onClick = { viewModel.updatePreferences(useAppVolumeOnly = true) }
                             )
-                            Text("Usar volume próprio do app (independente)", style = MaterialTheme.typography.bodySmall)
+                            Text(tr("Usar volume próprio do app (independente)"), style = MaterialTheme.typography.bodySmall)
                         }
                     }
 
@@ -1177,7 +1177,7 @@ fun GeneralSettingsContent(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Testar Som no Alto-falante do Celular")
+                        Text(tr("Testar Som no Alto-falante do Celular"))
                     }
 
                     HorizontalDivider()
@@ -1189,8 +1189,8 @@ fun GeneralSettingsContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("Fade-in suave", fontWeight = FontWeight.SemiBold)
-                            Text("Inicia o áudio baixo e aumenta suavemente", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr("Fade-in suave"), fontWeight = FontWeight.SemiBold)
+                            Text(tr("Inicia o áudio baixo e aumenta suavemente"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
                             checked = prefs.fadeInEnabled,
@@ -1204,7 +1204,7 @@ fun GeneralSettingsContent(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Duração do Fade-in", style = MaterialTheme.typography.bodySmall)
+                                Text(tr("Duração do Fade-in"), style = MaterialTheme.typography.bodySmall)
                                 Text(String.format(Locale.getDefault(), "%.1f s", prefs.fadeInDurationSeconds), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                             }
                             Slider(
@@ -1228,7 +1228,7 @@ fun GeneralSettingsContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Comportamento e Notificações", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(tr("Comportamento e Notificações"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
                     // Vibrate
@@ -1238,8 +1238,8 @@ fun GeneralSettingsContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("Vibrar junto com o áudio", fontWeight = FontWeight.SemiBold)
-                            Text("Gera pulso táctil no momento do disparo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr("Vibrar junto com o áudio"), fontWeight = FontWeight.SemiBold)
+                            Text(tr("Gera pulso táctil no momento do disparo"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
                             checked = prefs.vibrateWithAudio,
@@ -1256,8 +1256,8 @@ fun GeneralSettingsContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("Exibir rótulo do áudio", fontWeight = FontWeight.SemiBold)
-                            Text("Mostra o texto do lembrete na notificação ao tocar", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr("Exibir rótulo do áudio"), fontWeight = FontWeight.SemiBold)
+                            Text(tr("Mostra o texto do lembrete na notificação ao tocar"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
                             checked = prefs.showLabelInNotification,
@@ -1274,8 +1274,8 @@ fun GeneralSettingsContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Respeitar Não Perturbe do Sistema", fontWeight = FontWeight.SemiBold)
-                            Text("Pula o disparo e envia aviso discreto se o Não perturbe do Android estiver ativo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr("Respeitar Não Perturbe do Sistema"), fontWeight = FontWeight.SemiBold)
+                            Text(tr("Pula o disparo e envia aviso discreto se o Não perturbe do Android estiver ativo"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
                             checked = prefs.respectDoNotDisturb,
@@ -1296,11 +1296,11 @@ fun GeneralSettingsContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Assistente de Bateria", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(tr("Assistente de Bateria"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
                     Text(
-                        text = "Para que os lembretes toquem com precisão com o aparelho bloqueado, o aplicativo precisa ter a otimização de bateria desativada.",
+                        text = tr("Para que os lembretes toquem com precisão com o aparelho bloqueado, o aplicativo precisa ter a otimização de bateria desativada."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1326,7 +1326,7 @@ fun GeneralSettingsContent(
                         }
 
                         Button(onClick = onOpenBatteryDialog) {
-                            Text("Instruções")
+                            Text(tr("Instruções"))
                         }
                     }
                 }
@@ -1345,11 +1345,11 @@ fun GeneralSettingsContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Permissão de Alarmes Exatos (SCHEDULE_EXACT_ALARM)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(tr("Permissão de Alarmes Exatos (SCHEDULE_EXACT_ALARM)"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
                     Text(
-                        text = "No Android 12+ (API 31+), o sistema exige autorização expressa do usuário para disparar alarmes no minuto e segundo exatos programados.",
+                        text = tr("No Android 12+ (API 31+), o sistema exige autorização expressa do usuário para disparar alarmes no minuto e segundo exatos programados."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1385,7 +1385,7 @@ fun GeneralSettingsContent(
                                 onClick = onOpenExactAlarmDialog,
                                 modifier = Modifier.testTag("exact_alarm_help_button")
                             ) {
-                                Text("Ajuda")
+                                Text(tr("Ajuda"))
                             }
                             Button(
                                 onClick = { viewModel.openExactAlarmSettings() },
@@ -1412,11 +1412,11 @@ fun GeneralSettingsContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Backup e Exportação", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(tr("Backup e Exportação"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
                     Text(
-                        text = "Exporte todos os perfis, descansos e configurações para um arquivo JSON ou restaure em outro aparelho.",
+                        text = tr("Exporte todos os perfis, descansos e configurações para um arquivo JSON ou restaure em outro aparelho."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1433,7 +1433,7 @@ fun GeneralSettingsContent(
                         ) {
                             Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Exportar")
+                            Text(tr("Exportar"))
                         }
 
                         Button(
@@ -1444,7 +1444,7 @@ fun GeneralSettingsContent(
                         ) {
                             Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Restaurar")
+                            Text(tr("Restaurar"))
                         }
                     }
                 }
@@ -1486,7 +1486,7 @@ fun BatteryAssistantDialog(
         },
         title = {
             Text(
-                text = "Otimização de Bateria e Lembretes",
+                        text = tr("Otimização de Bateria e Lembretes"),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -1543,7 +1543,7 @@ fun BatteryAssistantDialog(
                                 ) {
                                     Icon(Icons.Default.Refresh, contentDescription = "Verificar", modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Verificar", style = MaterialTheme.typography.labelSmall)
+                                    Text(tr("Verificar"), style = MaterialTheme.typography.labelSmall)
                                 }
                             }
 
@@ -1574,7 +1574,7 @@ fun BatteryAssistantDialog(
                         ) {
                             Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Solicitar Isenção Direta")
+                            Text(tr("Solicitar Isenção Direta"))
                         }
 
                         OutlinedButton(
@@ -1592,7 +1592,7 @@ fun BatteryAssistantDialog(
                         ) {
                             Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Abrir Configurações do App")
+                            Text(tr("Abrir Configurações do App"))
                         }
                     }
                 }
@@ -1601,13 +1601,13 @@ fun BatteryAssistantDialog(
                 item {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Text(
-                        text = "Passo a Passo para Whitelist",
+                        text = tr("Passo a Passo para Whitelist"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Selecione o modelo do seu dispositivo para ver o guia detalhado:",
+                        text = tr("Selecione o modelo do seu dispositivo para ver o guia detalhado:"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1622,7 +1622,7 @@ fun BatteryAssistantDialog(
                         FilterChip(
                             selected = selectedGuideCategory == 0,
                             onClick = { selectedGuideCategory = 0 },
-                            label = { Text("Padrão / Pixel / Moto") },
+                            label = { Text(tr("Padrão / Pixel / Moto")) },
                             leadingIcon = {
                                 if (selectedGuideCategory == 0) Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                             }
@@ -1630,7 +1630,7 @@ fun BatteryAssistantDialog(
                         FilterChip(
                             selected = selectedGuideCategory == 1,
                             onClick = { selectedGuideCategory = 1 },
-                            label = { Text("Samsung (One UI)") },
+                            label = { Text(tr("Samsung (One UI)")) },
                             leadingIcon = {
                                 if (selectedGuideCategory == 1) Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                             }
@@ -1638,7 +1638,7 @@ fun BatteryAssistantDialog(
                         FilterChip(
                             selected = selectedGuideCategory == 2,
                             onClick = { selectedGuideCategory = 2 },
-                            label = { Text("Xiaomi / Redmi (MIUI)") },
+                            label = { Text(tr("Xiaomi / Redmi (MIUI)")) },
                             leadingIcon = {
                                 if (selectedGuideCategory == 2) Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                             }
@@ -1646,7 +1646,7 @@ fun BatteryAssistantDialog(
                         FilterChip(
                             selected = selectedGuideCategory == 3,
                             onClick = { selectedGuideCategory = 3 },
-                            label = { Text("Outros Fabricantes") },
+                            label = { Text(tr("Outros Fabricantes")) },
                             leadingIcon = {
                                 if (selectedGuideCategory == 3) Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                             }
@@ -1668,13 +1668,13 @@ fun BatteryAssistantDialog(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        text = "📱 Android Padrão (Pixel, Motorola, etc.)",
+                        text = tr("📱 Android Padrão (Pixel, Motorola, etc.)"),
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "1. Toque no botão 'Solicitar Isenção Direta' acima e selecione 'Permitir' na caixa de diálogo do sistema.\n\n" +
+                        text = tr("1. Toque no botão 'Solicitar Isenção Direta' acima e selecione 'Permitir' na caixa de diálogo do sistema.\n\n") +
                                                 "2. Caso o pop-up não apareça, toque em 'Abrir Configurações do App'.\n\n" +
                                                 "3. Toque em 'Bateria' (ou 'Uso de bateria do aplicativo').\n\n" +
                                                 "4. Selecione a opção 'Sem restrições' (Unrestricted) em vez de 'Otimizado'.\n\n" +
@@ -1696,13 +1696,13 @@ fun BatteryAssistantDialog(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        text = "📱 Samsung Galaxy (One UI)",
+                        text = tr("📱 Samsung Galaxy (One UI)"),
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "1. Toque em 'Abrir Configurações do App' > toque em 'Bateria' e escolha 'Sem restrições'.\n\n" +
+                        text = tr("1. Toque em 'Abrir Configurações do App' > toque em 'Bateria' e escolha 'Sem restrições'.\n\n") +
                                                 "2. Abra as Configurações do aparelho > Bateria > 'Limites de uso em segundo plano'.\n\n" +
                                                 "3. Toque em 'Aplicativos que nunca são suspensos' > toque no botão '+' no topo e adicione o 'Lembretes em Áudio'.\n\n" +
                                                 "4. Verifique também se o app não está marcado na lista de 'Aplicativos em suspensão profunda'.",
@@ -1723,13 +1723,13 @@ fun BatteryAssistantDialog(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        text = "📱 Xiaomi, Redmi & POCO (MIUI / HyperOS)",
+                        text = tr("📱 Xiaomi, Redmi & POCO (MIUI / HyperOS)"),
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "1. Toque em 'Abrir Configurações do App' e ative a chave 'Início Automático' (Autostart).\n\n" +
+                        text = tr("1. Toque em 'Abrir Configurações do App' e ative a chave 'Início Automático' (Autostart).\n\n") +
                                                 "2. Na mesma tela, toque em 'Economia de bateria' e selecione 'Nenhuma restrição' (Sem restrições).\n\n" +
                                                 "3. Abra a tela de apps recentes (multitarefa), mantenha o dedo pressionado no app e toque no ícone de Cadeado para travá-lo na RAM.",
                                         style = MaterialTheme.typography.bodySmall,
@@ -1749,13 +1749,13 @@ fun BatteryAssistantDialog(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        text = "📱 Huawei, Realme, OPPO, Vivo, ASUS",
+                        text = tr("📱 Huawei, Realme, OPPO, Vivo, ASUS"),
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "1. Vá em Configurações > Aplicativos > Lembretes em Áudio.\n\n" +
+                        text = tr("1. Vá em Configurações > Aplicativos > Lembretes em Áudio.\n\n") +
                                                 "2. Em 'Inicialização de apps' ou 'Gerenciador de Inicialização', desative o modo automático e ative 'Permitir execução em segundo plano' e 'Início automático'.\n\n" +
                                                 "3. Em 'Otimização de Bateria', marque a opção 'Não permitir otimização'.",
                                         style = MaterialTheme.typography.bodySmall,
@@ -1786,7 +1786,7 @@ fun BatteryAssistantDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Dica: No Android 12 ou superior, verifique também se a permissão 'Alarmes e lembretes' está habilitada para permitir disparos pontuais no horário exato.",
+                        text = tr("Dica: No Android 12 ou superior, verifique também se a permissão 'Alarmes e lembretes' está habilitada para permitir disparos pontuais no horário exato."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
@@ -1800,7 +1800,7 @@ fun BatteryAssistantDialog(
                 onClick = onDismiss,
                 modifier = Modifier.testTag("btn_close_battery_dialog")
             ) {
-                Text("Entendi")
+                Text(tr("Entendi"))
             }
         }
     )
@@ -1829,7 +1829,7 @@ fun ExactAlarmPermissionDialog(
         },
         title = {
             Text(
-                text = "Permissão de Alarmes Exatos",
+                        text = tr("Permissão de Alarmes Exatos"),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -1877,12 +1877,12 @@ fun ExactAlarmPermissionDialog(
                 }
 
                 Text(
-                    text = "A partir do Android 12 (API 31+), o sistema exige permissão explícita (SCHEDULE_EXACT_ALARM) para disparos pontuais.",
+                        text = tr("A partir do Android 12 (API 31+), o sistema exige permissão explícita (SCHEDULE_EXACT_ALARM) para disparos pontuais."),
                     style = MaterialTheme.typography.bodyMedium
                 )
 
                 Text(
-                    text = "Passos para ativar:\n1. Clique em 'Abrir Configurações' abaixo.\n2. Na tela do sistema, ative 'Permitir definição de alarmes e lembretes'.\n3. Retorne ao app e a verificação será atualizada automaticamente.",
+                        text = tr("Passos para ativar:\n1. Clique em 'Abrir Configurações' abaixo.\n2. Na tela do sistema, ative 'Permitir definição de alarmes e lembretes'.\n3. Retorne ao app e a verificação será atualizada automaticamente."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1904,7 +1904,7 @@ fun ExactAlarmPermissionDialog(
                 onClick = onDismiss,
                 modifier = Modifier.testTag("btn_dismiss_exact_alarm_dialog")
             ) {
-                Text("Fechar")
+                Text(tr("Fechar"))
             }
         }
     )
@@ -1973,7 +1973,7 @@ fun DiagnosticsSettingsContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Status Operacional do Sistema",
+                        text = tr("Status Operacional do Sistema"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -2009,7 +2009,7 @@ fun DiagnosticsSettingsContent(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Saída de Áudio Atual",
+                        text = tr("Saída de Áudio Atual"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2041,7 +2041,7 @@ fun DiagnosticsSettingsContent(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Permissão de Alarmes Exatos",
+                        text = tr("Permissão de Alarmes Exatos"),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -2065,7 +2065,7 @@ fun DiagnosticsSettingsContent(
                                 },
                                 modifier = Modifier.testTag("btn_fix_exact_alarm")
                             ) {
-                                Text("Ajustar", style = MaterialTheme.typography.labelMedium)
+                                Text(tr("Ajustar"), style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
@@ -2090,7 +2090,7 @@ fun DiagnosticsSettingsContent(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Otimização de Bateria",
+                        text = tr("Otimização de Bateria"),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -2107,7 +2107,7 @@ fun DiagnosticsSettingsContent(
                                 onClick = onOpenBatteryDialog,
                                 modifier = Modifier.testTag("btn_open_battery_from_diagnostics")
                             ) {
-                                Text("Resolver", style = MaterialTheme.typography.labelMedium)
+                                Text(tr("Resolver"), style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
@@ -2141,7 +2141,7 @@ fun DiagnosticsSettingsContent(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Ações de Diagnóstico e Teste",
+                        text = tr("Ações de Diagnóstico e Teste"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -2158,7 +2158,7 @@ fun DiagnosticsSettingsContent(
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Testar Disparo de Áudio Agora (Gera logs em tempo real)", fontWeight = FontWeight.Bold)
+                        Text(tr("Testar Disparo de Áudio Agora (Gera logs em tempo real)"), fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -2172,7 +2172,7 @@ fun DiagnosticsSettingsContent(
                                 try {
                                     val text = viewModel.getDiagnosticLogsText()
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                    val clip = ClipData.newPlainText("Logs de Diagnóstico", text)
+                                    val clip = ClipData.newPlainText(tr("Logs de Diagnóstico"), text)
                                     clipboard?.setPrimaryClip(clip)
                                     Toast.makeText(context, "Histórico de logs copiado para a área de transferência!", Toast.LENGTH_SHORT).show()
                                 } catch (_: Throwable) {
@@ -2185,7 +2185,7 @@ fun DiagnosticsSettingsContent(
                         ) {
                             Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Copiar Logs")
+                            Text(tr("Copiar Logs"))
                         }
 
                         OutlinedButton(
@@ -2199,7 +2199,7 @@ fun DiagnosticsSettingsContent(
                         ) {
                             Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Limpar")
+                            Text(tr("Limpar"))
                         }
                     }
                 }
@@ -2215,7 +2215,7 @@ fun DiagnosticsSettingsContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Registros de Eventos (${filteredLogs.size})",
+                        text = tr("Registros de Eventos (${filteredLogs.size})"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -2224,7 +2224,7 @@ fun DiagnosticsSettingsContent(
                             selectedCategoryFilter = null
                             selectedLevelFilter = null
                         }) {
-                            Text("Resetar Filtros", style = MaterialTheme.typography.labelSmall)
+                            Text(tr("Resetar Filtros"), style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
@@ -2243,7 +2243,7 @@ fun DiagnosticsSettingsContent(
                             selectedCategoryFilter = null
                             selectedLevelFilter = null
                         },
-                        label = { Text("Todos") },
+                        label = { Text(tr("Todos")) },
                         modifier = Modifier.testTag("filter_chip_all")
                     )
 
@@ -2252,7 +2252,7 @@ fun DiagnosticsSettingsContent(
                         onClick = {
                             selectedCategoryFilter = if (selectedCategoryFilter == DiagnosticCategory.PLAYBACK) null else DiagnosticCategory.PLAYBACK
                         },
-                        label = { Text("Reprodução") },
+                        label = { Text(tr("Reprodução")) },
                         modifier = Modifier.testTag("filter_chip_playback")
                     )
 
@@ -2261,7 +2261,7 @@ fun DiagnosticsSettingsContent(
                         onClick = {
                             selectedCategoryFilter = if (selectedCategoryFilter == DiagnosticCategory.ROUTING) null else DiagnosticCategory.ROUTING
                         },
-                        label = { Text("Roteamento") },
+                        label = { Text(tr("Roteamento")) },
                         modifier = Modifier.testTag("filter_chip_routing")
                     )
 
@@ -2270,7 +2270,7 @@ fun DiagnosticsSettingsContent(
                         onClick = {
                             selectedCategoryFilter = if (selectedCategoryFilter == DiagnosticCategory.ALARM) null else DiagnosticCategory.ALARM
                         },
-                        label = { Text("Alarmes") },
+                        label = { Text(tr("Alarmes")) },
                         modifier = Modifier.testTag("filter_chip_alarm")
                     )
 
@@ -2279,7 +2279,7 @@ fun DiagnosticsSettingsContent(
                         onClick = {
                             selectedCategoryFilter = if (selectedCategoryFilter == DiagnosticCategory.SERVICE) null else DiagnosticCategory.SERVICE
                         },
-                        label = { Text("Serviço") },
+                        label = { Text(tr("Serviço")) },
                         modifier = Modifier.testTag("filter_chip_service")
                     )
 
@@ -2288,7 +2288,7 @@ fun DiagnosticsSettingsContent(
                         onClick = {
                             selectedLevelFilter = if (selectedLevelFilter == DiagnosticLevel.ERROR) null else DiagnosticLevel.ERROR
                         },
-                        label = { Text("Erros") },
+                        label = { Text(tr("Erros")) },
                         modifier = Modifier.testTag("filter_chip_errors")
                     )
                 }
@@ -2319,13 +2319,13 @@ fun DiagnosticsSettingsContent(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Nenhum evento registrado com o filtro atual.",
+                        text = tr("Nenhum evento registrado com o filtro atual."),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Toque em 'Testar Disparo de Áudio Agora' acima para executar uma verificação completa e registrar o evento.",
+                        text = tr("Toque em 'Testar Disparo de Áudio Agora' acima para executar uma verificação completa e registrar o evento."),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
