@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.util.AudioDiagnosticLogger
+import com.example.ui.i18n.tr
 import com.example.util.DiagnosticCategory
 import com.example.util.DiagnosticLevel
 import com.example.util.DiagnosticLogEntry
@@ -165,6 +166,23 @@ fun SettingsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(tr("Idioma da aplicação"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("pt-BR" to "PT-BR", "en" to "English", "es" to "Español").forEach { (code, label) ->
+                        if (prefs.appLanguage == code) {
+                            Button(onClick = { viewModel.setAppLanguage(code) }, modifier = Modifier.weight(1f)) { Text(label) }
+                        } else {
+                            OutlinedButton(onClick = { viewModel.setAppLanguage(code) }, modifier = Modifier.weight(1f)) { Text(label) }
+                        }
+                    }
+                }
+            }
+        }
         // Alerta fixo caso a permissão de alarme exato não esteja concedida no Android 12+ (API 31+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !uiState.canScheduleExactAlarms) {
             Surface(
