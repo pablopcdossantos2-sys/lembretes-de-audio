@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.i18n.tr
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -140,12 +142,12 @@ fun ProfilesScreen(
             ) {
                 Column {
                     Text(
-                        text = "Perfis de Programação",
+                        text = tr("Perfis de Programação"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Defina horários, frequências e períodos de descanso",
+                        text = tr("Defina horários, frequências e períodos de descanso"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -158,7 +160,7 @@ fun ProfilesScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Novo Perfil", fontSize = 13.sp)
+                    Text(tr("Novo Perfil"), fontSize = 13.sp)
                 }
             }
 
@@ -179,7 +181,7 @@ fun ProfilesScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Nenhum perfil cadastrado",
+                        text = tr("Nenhum perfil cadastrado"),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -248,8 +250,8 @@ fun ProfilesScreen(
         profileToDelete?.let { profile ->
             AlertDialog(
                 onDismissRequest = { profileToDelete = null },
-                title = { Text("Excluir Perfil") },
-                text = { Text("Deseja realmente remover o perfil \"${profile.name}\"? Todos os horários e períodos de descanso associados serão excluídos.") },
+                title = { Text(tr("Excluir Perfil")) },
+                text = { Text(tr("Deseja realmente remover o perfil \"${profile.name}\"? Todos os horários e períodos de descanso associados serão excluídos.")) },
                 confirmButton = {
                     Button(
                         onClick = {
@@ -258,12 +260,12 @@ fun ProfilesScreen(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Text("Excluir")
+                        Text(tr("Excluir"))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { profileToDelete = null }) {
-                        Text("Cancelar")
+                        Text(tr("Cancelar"))
                     }
                 }
             )
@@ -312,7 +314,7 @@ fun ProfileCard(
                         color = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Text(
-                            text = "P${profile.priority}",
+                        text = tr("P${profile.priority}"),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -415,7 +417,7 @@ fun ProfileCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Horários de Descanso:",
+                        text = tr("Horários de Descanso:"),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.secondary
@@ -455,7 +457,7 @@ fun ProfileCard(
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Duplicar", fontSize = 12.sp)
+                    Text(tr("Duplicar"), fontSize = 12.sp)
                 }
 
                 Spacer(modifier = Modifier.width(4.dp))
@@ -466,7 +468,7 @@ fun ProfileCard(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Editar", fontSize = 12.sp)
+                    Text(tr("Editar"), fontSize = 12.sp)
                 }
 
                 Spacer(modifier = Modifier.width(4.dp))
@@ -478,7 +480,7 @@ fun ProfileCard(
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Excluir", fontSize = 12.sp)
+                    Text(tr("Excluir"), fontSize = 12.sp)
                 }
             }
         }
@@ -526,7 +528,7 @@ fun ProfileEditDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Nome do Perfil") },
+                    label = { Text(tr("Nome do Perfil")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -537,8 +539,8 @@ fun ProfileEditDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Prioridade de Execução", style = MaterialTheme.typography.bodyMedium)
-                        Text("$priority", fontWeight = FontWeight.Bold)
+                        Text(tr("Prioridade de Execução"), style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("$priority"), fontWeight = FontWeight.Bold)
                     }
                     Slider(
                         value = priority.toFloat(),
@@ -550,7 +552,7 @@ fun ProfileEditDialog(
 
                 // Dias da semana
                 Column {
-                    Text("Dias da Semana Ativos", style = MaterialTheme.typography.bodyMedium)
+                    Text(tr("Dias da Semana Ativos"), style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(6.dp))
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -588,7 +590,7 @@ fun ProfileEditDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Início", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr("Início"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 String.format(Locale.getDefault(), "%02d:%02d", startTime.hour, startTime.minute),
                                 fontWeight = FontWeight.Bold
@@ -601,7 +603,7 @@ fun ProfileEditDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Fim", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr("Fim"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 String.format(Locale.getDefault(), "%02d:%02d", endTime.hour, endTime.minute),
                                 fontWeight = FontWeight.Bold
@@ -612,7 +614,7 @@ fun ProfileEditDialog(
 
                 // Periodicidade
                 Column {
-                    Text("Intervalo entre disparos", style = MaterialTheme.typography.bodyMedium)
+                    Text(tr("Intervalo entre disparos"), style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(6.dp))
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -623,7 +625,7 @@ fun ProfileEditDialog(
                             FilterChip(
                                 selected = intervalMinutes == mins,
                                 onClick = { intervalMinutes = mins },
-                                label = { Text("${mins}m") }
+                                label = { Text(tr("${mins}m")) }
                             )
                         }
                     }
@@ -643,8 +645,7 @@ fun ProfileEditDialog(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Bedtime, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    "Horários de Descanso",
+                                Text(tr("Horários de Descanso"),
                                     fontWeight = FontWeight.Bold,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -652,13 +653,13 @@ fun ProfileEditDialog(
                             TextButton(onClick = { showAddRestDialog = true }) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Adicionar", fontSize = 12.sp)
+                                Text(tr("Adicionar"), fontSize = 12.sp)
                             }
                         }
 
                         if (restingPeriods.isEmpty()) {
                             Text(
-                                text = "Nenhum horário de descanso adicionado. Os lembretes tocarão continuamente no horário ativo.",
+                        text = tr("Nenhum horário de descanso adicionado. Os lembretes tocarão continuamente no horário ativo."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -702,18 +703,18 @@ fun ProfileEditDialog(
 
                 // Ordem de Reprodução
                 Column {
-                    Text("Modo de Reprodução", style = MaterialTheme.typography.bodyMedium)
+                    Text(tr("Modo de Reprodução"), style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = playbackOrder == PlaybackOrder.SEQUENTIAL,
                             onClick = { playbackOrder = PlaybackOrder.SEQUENTIAL },
-                            label = { Text("Sequencial") }
+                            label = { Text(tr("Sequencial")) }
                         )
                         FilterChip(
                             selected = playbackOrder == PlaybackOrder.RANDOM,
                             onClick = { playbackOrder = PlaybackOrder.RANDOM },
-                            label = { Text("Aleatório") }
+                            label = { Text(tr("Aleatório")) }
                         )
                     }
                 }
@@ -725,8 +726,8 @@ fun ProfileEditDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Sobrescrever Fade-in", style = MaterialTheme.typography.bodyMedium)
-                        Text("Aumenta o volume gradualmente neste perfil", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr("Sobrescrever Fade-in"), style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("Aumenta o volume gradualmente neste perfil"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = fadeInOverride, onCheckedChange = { fadeInOverride = it })
                 }
@@ -752,12 +753,12 @@ fun ProfileEditDialog(
                     )
                 }
             ) {
-                Text("Salvar Perfil")
+                Text(tr("Salvar Perfil"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(tr("Cancelar"))
             }
         }
     )
@@ -817,13 +818,13 @@ fun AddRestingPeriodDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Adicionar Horário de Descanso") },
+        title = { Text(tr("Adicionar Horário de Descanso")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = label,
                     onValueChange = { label = it },
-                    label = { Text("Nome da Pausa / Descanso") },
+                    label = { Text(tr("Nome da Pausa / Descanso")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -837,7 +838,7 @@ fun AddRestingPeriodDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Início Pausa", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr("Início Pausa"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 String.format(Locale.getDefault(), "%02d:%02d", restStart.hour, restStart.minute),
                                 fontWeight = FontWeight.Bold
@@ -850,7 +851,7 @@ fun AddRestingPeriodDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Fim Pausa", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(tr("Fim Pausa"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 String.format(Locale.getDefault(), "%02d:%02d", restEnd.hour, restEnd.minute),
                                 fontWeight = FontWeight.Bold
@@ -866,12 +867,12 @@ fun AddRestingPeriodDialog(
                     onAdd(label.ifBlank { "Descanso" }, restStart, restEnd)
                 }
             ) {
-                Text("Adicionar")
+                Text(tr("Adicionar"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(tr("Cancelar"))
             }
         }
     )
