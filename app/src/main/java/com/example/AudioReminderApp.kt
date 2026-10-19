@@ -1,5 +1,7 @@
 package com.example
 
+import com.example.R
+
 /*
  * Lembretes em Áudio / Audio Reminders
  * Aplicativo Android nativo desenvolvido de forma independente por Pablo Phillipe Cândido dos Santos
@@ -74,10 +76,10 @@ class AudioReminderApp : Application() {
             // Canal para lembretes em áudio com prioridade ALTA (intrusivo com som, vibração e banner)
             val remindersChannel = NotificationChannel(
                 CHANNEL_ID_REMINDERS,
-                "Lembretes Periódicos (Alta Prioridade)",
+                getString(R.string.channel_reminders_name),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Disparos periódicos de áudios configurados com alertas visuais intrusivos"
+                description = getString(R.string.channel_reminders_name)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 450, 200, 450)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
@@ -90,7 +92,7 @@ class AudioReminderApp : Application() {
             // Canal para o serviço em primeiro plano (persistente em segundo plano)
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID_SERVICE,
-                "Serviço de Execução Contínua",
+                getString(R.string.channel_service_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Mantém o serviço ativo para precisão de alarmes e horários de descanso"
