@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.ui.i18n.tr
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,16 +46,16 @@ fun SimpleTimePickerDialog(
                     onConfirm(LocalTime.of(timePickerState.hour, timePickerState.minute))
                 }
             ) {
-                Text("Confirmar")
+                Text(tr("Confirmar"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(tr("Cancelar"))
             }
         },
         title = {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(text = tr(title), style = MaterialTheme.typography.titleMedium)
         },
         text = {
             Column(
