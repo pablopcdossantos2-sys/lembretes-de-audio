@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -126,46 +127,48 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             } else emptyList()
 
-            // Preserva áudios existentes; em uma instalação nova, cria apenas um exemplo.
-            val existingAudios = audioDao.getAllAudios()
-            if (existingAudios.isEmpty()) {
-                val demoAudioUri = if (bundledFiles.isNotEmpty() && bundledFiles[0].exists()) {
-                    "file://${bundledFiles[0].absolutePath}"
-                } else {
-                    "tts:beba_agua"
+            // Serialize seeding so concurrent startup paths cannot create duplicate samples.
+            database.withTransaction {
+                // Preserva áudios existentes; em uma instalação nova, cria apenas um exemplo.
+                if (audioDao.getAllAudios().isEmpty()) {
+                    val demoAudioUri = if (bundledFiles.isNotEmpty() && bundledFiles[0].exists()) {
+                        "file://${bundledFiles[0].absolutePath}"
+                    } else {
+                        "tts:beba_agua"
+                    }
+                    val demoAudio = AudioItemEntity(
+                        uriString = demoAudioUri,
+                        label = "Hora de Beber Água",
+                        weight = 4,
+                        volumePercent = 100,
+                        isActive = true,
+                        audioType = if (demoAudioUri.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
+                        ttsText = "Lembrete: beba um copo d'água e mantenha-se hidratado."
+                    )
+                    audioDao.insertAudio(demoAudio)
                 }
-                val demoAudio = AudioItemEntity(
-                    uriString = demoAudioUri,
-                    label = "Hora de Beber Água",
-                    weight = 4,
-                    volumePercent = 100,
-                    isActive = true,
-                    audioType = if (demoAudioUri.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
-                    ttsText = "Lembrete: beba um copo d'água e mantenha-se hidratado."
-                )
-                audioDao.insertAudio(demoAudio)
-            }
 
-            // Não substitui nem apaga perfis existentes.
-            if (profileDao.getAllProfilesWithRests().isEmpty()) {
-                val demoProfile = ProfileEntity(
-                    name = "Perfil de Demonstração",
-                    isEnabled = true,
-                    priority = 10,
-                    daysOfWeekCsv = "1,2,3,4,5,6,7",
-                    startHour = 8,
-                    startMinute = 0,
-                    endHour = 18,
-                    endMinute = 0,
-                    intervalMinutes = 15,
-                    playbackOrder = "SEQUENTIAL",
-                    specificAudioId = null,
-                    audioIdsCsv = "",
-                    resumePolicy = "NEXT_GRID_MARK",
-                    fadeInOverrideEnabled = false,
-                    fadeInDurationSeconds = 2.0f
-                )
-                profileDao.upsertProfileWithRests(demoProfile, emptyList())
+                // Não substitui nem apaga perfis existentes.
+                if (profileDao.getAllProfilesWithRests().isEmpty()) {
+                    val demoProfile = ProfileEntity(
+                        name = "Perfil de Demonstração",
+                        isEnabled = true,
+                        priority = 10,
+                        daysOfWeekCsv = "1,2,3,4,5,6,7",
+                        startHour = 8,
+                        startMinute = 0,
+                        endHour = 18,
+                        endMinute = 0,
+                        intervalMinutes = 15,
+                        playbackOrder = "SEQUENTIAL",
+                        specificAudioId = null,
+                        audioIdsCsv = "",
+                        resumePolicy = "NEXT_GRID_MARK",
+                        fadeInOverrideEnabled = false,
+                        fadeInDurationSeconds = 2.0f
+                    )
+                    profileDao.upsertProfileWithRests(demoProfile, emptyList())
+                }
             }
         }
     }
