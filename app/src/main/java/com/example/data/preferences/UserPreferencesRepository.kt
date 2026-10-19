@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.map
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
 data class UserPreferences(
+    val appLanguage: String = "pt-BR",
     val isAppMasterEnabled: Boolean = false,
     val masterVolumePercent: Int = 100,
     val useAppVolumeOnly: Boolean = false,
@@ -40,6 +41,7 @@ data class UserPreferences(
 class UserPreferencesRepository(private val context: Context) {
 
     private object Keys {
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
         val APP_MASTER_ENABLED = booleanPreferencesKey("app_master_enabled")
         val MASTER_VOLUME_PERCENT = intPreferencesKey("master_volume_percent")
         val USE_APP_VOLUME_ONLY = booleanPreferencesKey("use_app_volume_only")
@@ -62,6 +64,7 @@ class UserPreferencesRepository(private val context: Context) {
 
     val preferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
+            appLanguage = prefs[Keys.APP_LANGUAGE] ?: "pt-BR",
             isAppMasterEnabled = prefs[Keys.APP_MASTER_ENABLED] ?: false,
             masterVolumePercent = prefs[Keys.MASTER_VOLUME_PERCENT] ?: 100,
             useAppVolumeOnly = prefs[Keys.USE_APP_VOLUME_ONLY] ?: false,
@@ -130,6 +133,11 @@ class UserPreferencesRepository(private val context: Context) {
             val current = prefs[Keys.LAST_SEQUENTIAL_INDEX] ?: 0
             prefs[Keys.LAST_SEQUENTIAL_INDEX] = current + 1
         }
+    }
+
+    suspend fun setAppLanguage(language: String) {
+        val supported = setOf("pt-BR", "en", "es")
+        context.dataStore.edit { it[Keys.APP_LANGUAGE] = if (language in supported) language else "pt-BR" }
     }
 
     suspend fun setQuietHours(
