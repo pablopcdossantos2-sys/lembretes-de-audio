@@ -23,6 +23,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.ByteArrayOutputStream
 
 @RunWith(RobolectricTestRunner::class)
@@ -146,5 +147,28 @@ class BackupManagerTest {
         assertTrue(targetDb.audioDao().getAllAudios().isEmpty())
         assertTrue(targetDb.profileDao().getAllProfilesWithRests().isEmpty())
         assertTrue(targetDb.reminderDao().getAllReminders().isEmpty())
+    }
+
+    @Test
+    fun `import disables reminder when its local audio file is missing`() = runBlocking {
+        val missingFile = File(context.filesDir, "audio-that-does-not-exist.wav")
+        sourceDb.reminderDao().insertReminder(
+            ReminderEntity(
+                title = "Lembrete com áudio ausente",
+                audioFilePath = missingFile.absolutePath,
+                isEnabled = true
+            )
+        )
+
+        val output = ByteArrayOutputStream()
+        assertTrue(BackupManager(context, sourceDb, prefs).exportConfig(output))
+
+        val result = BackupManager(context, targetDb, prefs).importConfig(
+            ByteArrayInputStream(output.toByteArray())
+        )
+
+        assertTrue(result.message, result.success)
+        val importedReminder = targetDb.reminderDao().getAllReminders().single()
+        assertFalse("Lembrete sem o arquivo local não deve ser ativado", importedReminder.isEnabled)
     }
 }
