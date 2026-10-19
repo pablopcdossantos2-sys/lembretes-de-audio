@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Recordatorios de audio</string>
+    <string name="channel_reminders_name">Recordatorios periódicos</string>
+    <string name="channel_service_name">Servicio de reproducción continua</string>
+    <string name="channel_alerts_name">Períodos de descanso y avisos</string>
+</resources>
