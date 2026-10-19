@@ -19,6 +19,20 @@ private val english = mapOf(
     "Áudio e Geral" to "Audio & General",
     "Diagnósticos" to "Diagnostics",
     "Idioma da aplicação" to "App language",
+    "Backup processado com sucesso!" to "Backup processed successfully!",
+    "OK" to "OK",
+    "Inicia o áudio baixo e aumenta suavemente" to "Starts audio quietly and gradually raises the volume",
+    "Gera pulso táctil no momento do disparo" to "Vibrates when a reminder plays",
+    "Mostra o texto do lembrete na notificação ao tocar" to "Shows the reminder text in the playback notification",
+    "Pula o disparo e envia aviso discreto se o Não perturbe do Android estiver ativo" to "Skips playback and shows a quiet notice when Android Do Not Disturb is active",
+    "Permissão de Alarmes Exatos (SCHEDULE_EXACT_ALARM)" to "Exact alarm permission (SCHEDULE_EXACT_ALARM)",
+    "Testar Disparo de Áudio Agora (Gera logs em tempo real)" to "Test audio playback now (creates live logs)",
+    "Ouvir Disparo de Teste (Fones ou Alto-falante)" to "Play test sound (headphones or speaker)",
+    "Peso na Sorteio Aleatório" to "Weight for random selection",
+    "Ex: Beba um copo de água e alongue-se." to "E.g. Drink a glass of water and stretch.",
+    "Ex: Beber água, Tomar remédio" to "E.g. Drink water, take medication",
+    "-0.1s Início" to "-0.1s start",
+    "+0.1s Início" to "+0.1s start",
     "Permissão de Alarme Exato Necessária" to "Exact Alarm Permission Required",
     "No Android 12+, autorize 'Alarmes e lembretes' para disparos pontuais." to "On Android 12+, allow “Alarms & reminders” for precise scheduled alerts.",
     "Não Perturbe Programado" to "Scheduled Do Not Disturb",
@@ -179,6 +193,20 @@ private val spanish = mapOf(
     "Áudio e Geral" to "Audio y general",
     "Diagnósticos" to "Diagnósticos",
     "Idioma da aplicação" to "Idioma de la aplicación",
+    "Backup processado com sucesso!" to "¡Copia de seguridad procesada correctamente!",
+    "OK" to "OK",
+    "Inicia o áudio baixo e aumenta suavemente" to "Inicia el audio a bajo volumen y lo aumenta gradualmente",
+    "Gera pulso táctil no momento do disparo" to "Vibra cuando se reproduce un recordatorio",
+    "Mostra o texto do lembrete na notificação ao tocar" to "Muestra el texto del recordatorio en la notificación",
+    "Pula o disparo e envia aviso discreto se o Não perturbe do Android estiver ativo" to "Omite la reproducción y muestra un aviso discreto cuando Android tiene activado No molestar",
+    "Permissão de Alarmes Exatos (SCHEDULE_EXACT_ALARM)" to "Permiso de alarmas exactas (SCHEDULE_EXACT_ALARM)",
+    "Testar Disparo de Áudio Agora (Gera logs em tempo real)" to "Probar reproducción de audio (genera registros en tiempo real)",
+    "Ouvir Disparo de Teste (Fones ou Alto-falante)" to "Reproducir sonido de prueba (auriculares o altavoz)",
+    "Peso na Sorteio Aleatório" to "Peso en la selección aleatoria",
+    "Ex: Beba um copo de água e alongue-se." to "Ej.: bebe un vaso de agua y estírate.",
+    "Ex: Beber água, Tomar remédio" to "Ej.: beber agua, tomar medicación",
+    "-0.1s Início" to "-0,1 s inicio",
+    "+0.1s Início" to "+0,1 s inicio",
     "Permissão de Alarme Exato Necessária" to "Se requiere permiso de alarma exacta",
     "No Android 12+, autorize 'Alarmes e lembretes' para disparos pontuais." to "En Android 12+, permite «Alarmas y recordatorios» para avisos programados con precisión.",
     "Não Perturbe Programado" to "No molestar programado",
@@ -335,10 +363,17 @@ fun tr(text: String): String = when (LocalAppLanguage.current) {
 
 private fun dynamicTranslation(text: String, language: String): String {
     if (language == "en") {
+        if (text.startsWith("• ") && text.endsWith(" perfis importados")) return text.replace(" perfis importados", " profiles imported")
+        if (text.startsWith("• ") && text.endsWith(" referências de áudios importadas")) return text.replace(" referências de áudios importadas", " audio references imported")
+        if (text == "Pesquisar áudios e lembretes...") return "Search audio and reminders..."
+        if (text == "2 horas") return "2 hours"
         if (text.startsWith("Frequência atualizada para ")) return text.replace("Frequência atualizada para ", "Frequency updated to ").replace(" minutos nos perfis e lembretes vinculados.", " minutes for linked profiles and reminders.")
         if (text.startsWith("Áudio salvo.")) return text.replace("Áudio salvo.", "Audio saved.").replace("Não há perfil ou lembrete vinculado a este item para alterar a frequência.", "No profile or reminder is linked to this item, so its frequency cannot be changed.")
         if (text.startsWith("Lembrete \"") && text.endsWith("\" adicionado com sucesso.")) return text.replace("Lembrete \"", "Reminder \"").replace("\" adicionado com sucesso.", "\" added successfully.")
     } else if (language == "es") {
+        if (text.startsWith("• ") && text.endsWith(" perfis importados")) return text.replace(" perfis importados", " perfiles importados")
+        if (text.startsWith("• ") && text.endsWith(" referências de áudios importadas")) return text.replace(" referências de áudios importadas", " referencias de audio importadas")
+        if (text == "Pesquisar áudios e lembretes...") return "Buscar audios y recordatorios..."
         if (text.startsWith("Frequência atualizada para ")) return text.replace("Frequência atualizada para ", "Frecuencia actualizada a ").replace(" minutos nos perfis e lembretes vinculados.", " minutos en los perfiles y recordatorios vinculados.")
         if (text.startsWith("Áudio salvo.")) return text.replace("Áudio salvo.", "Audio guardado.").replace("Não há perfil ou lembrete vinculado a este item para alterar a frequência.", "No hay ningún perfil o recordatorio vinculado a este elemento para cambiar la frecuencia.")
         if (text.startsWith("Lembrete \"") && text.endsWith("\" adicionado com sucesso.")) return text.replace("Lembrete \"", "Recordatorio \"").replace("\" adicionado com sucesso.", "\" añadido correctamente.")
