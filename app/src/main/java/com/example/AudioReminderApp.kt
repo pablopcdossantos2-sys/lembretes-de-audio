@@ -1,5 +1,15 @@
 package com.example
 
+/*
+ * Lembretes em Áudio / Audio Reminders
+ * Aplicativo Android nativo desenvolvido de forma independente por Pablo Phillipe Cândido dos Santos
+ * para agendar e reproduzir lembretes sonoros e gravações em rotinas configuráveis.
+ * O desenvolvimento contou com ferramentas de IA generativa como recurso auxiliar.
+ * Independent Android app by Pablo Phillipe Cândido dos Santos for scheduled audio reminders.
+ * Generative AI tools were used as development aids; project decisions and verification remain the author's responsibility.
+ * Currículo Lattes: http://lattes.cnpq.br/9500873674712528
+ */
+
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
