@@ -128,7 +128,7 @@ abstract class AppDatabase : RoomDatabase() {
 
             // Preserva áudios existentes; em uma instalação nova, cria apenas um exemplo.
             val existingAudios = audioDao.getAllAudios()
-            val demoAudioId = existingAudios.firstOrNull()?.id ?: run {
+            if (existingAudios.isEmpty()) {
                 val demoAudioUri = if (bundledFiles.isNotEmpty() && bundledFiles[0].exists()) {
                     "file://${bundledFiles[0].absolutePath}"
                 } else {
