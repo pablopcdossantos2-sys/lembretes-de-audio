@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.ui.i18n.tr
+
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -109,7 +111,7 @@ fun AudioRecordDialog(
             },
             title = {
                 Text(
-                    text = "Permissão de Gravação de Áudio",
+                        text = tr("Permissão de Gravação de Áudio"),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold
                 )
@@ -120,7 +122,7 @@ fun AudioRecordDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "O aplicativo precisa de acesso ao microfone para que você possa gravar seus próprios lembretes, metas e afirmações diretamente pelo celular.",
+                        text = tr("O aplicativo precisa de acesso ao microfone para que você possa gravar seus próprios lembretes, metas e afirmações diretamente pelo celular."),
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center
                     )
@@ -142,7 +144,7 @@ fun AudioRecordDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Permissão negada. É necessário ativá-la nas configurações do aplicativo.",
+                        text = tr("Permissão negada. É necessário ativá-la nas configurações do aplicativo."),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
@@ -166,7 +168,7 @@ fun AudioRecordDialog(
                     ) {
                         Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Abrir Configurações")
+                        Text(tr("Abrir Configurações"))
                     }
                 } else {
                     Button(
@@ -175,13 +177,13 @@ fun AudioRecordDialog(
                         },
                         modifier = Modifier.testTag("request_record_audio_permission_button")
                     ) {
-                        Text("Conceder Permissão")
+                        Text(tr("Conceder Permissão"))
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancelar")
+                    Text(tr("Cancelar"))
                 }
             }
         )
@@ -376,14 +378,14 @@ private fun RecordingActiveDialog(
                         OutlinedTextField(
                             value = label,
                             onValueChange = { label = it },
-                            label = { Text("Nome do Lembrete") },
+                            label = { Text(tr("Nome do Lembrete")) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
 
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
-                                text = "Periodicidade: $periodicityMinutes min",
+                        text = tr("Periodicidade: $periodicityMinutes min"),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -396,7 +398,7 @@ private fun RecordingActiveDialog(
                                     FilterChip(
                                         selected = periodicityMinutes == mins,
                                         onClick = { periodicityMinutes = mins },
-                                        label = { Text("$mins m", style = MaterialTheme.typography.labelSmall) }
+                                        label = { Text(tr("$mins m"), style = MaterialTheme.typography.labelSmall) }
                                     )
                                 }
                             }
@@ -425,7 +427,7 @@ private fun RecordingActiveDialog(
                     },
                     modifier = Modifier.testTag("save_recorded_audio_button")
                 ) {
-                    Text("Salvar na biblioteca")
+                    Text(tr("Salvar na biblioteca"))
                 }
             }
         },
@@ -437,7 +439,7 @@ private fun RecordingActiveDialog(
                     onDismiss()
                 }
             ) {
-                Text("Cancelar")
+                Text(tr("Cancelar"))
             }
         }
     )
