@@ -236,15 +236,20 @@ class BackupManager(
                     val item = remindersArray.getJSONObject(i)
                     val oldProfileId = item.optLongOrNull("profileId")
                     val newProfileId = oldProfileId?.let { profileIdMap[it] }
+                    val audioFilePath = item.optNullableString("audioFilePath")
+                    val audioUri = item.optNullableString("audioUri")
+                    val localAudioFilesAvailable =
+                        (audioFilePath == null || localFileExists(audioFilePath)) &&
+                            (audioUri == null || !audioUri.startsWith("file://") || localFileExists(audioUri))
                     val entity = ReminderEntity(
                         id = 0L,
                         profileId = newProfileId,
                         title = item.optString("title", "Lembrete"),
                         text = item.optString("text", ""),
-                        audioFilePath = item.optNullableString("audioFilePath"),
-                        audioUri = item.optNullableString("audioUri"),
+                        audioFilePath = audioFilePath,
+                        audioUri = audioUri,
                         intervalMinutes = item.optInt("intervalMinutes", 15).coerceAtLeast(1),
-                        isEnabled = item.optBoolean("isEnabled", true),
+                        isEnabled = item.optBoolean("isEnabled", true) && localAudioFilesAvailable,
                         hasRestPeriod = item.optBoolean("hasRestPeriod", false),
                         startHour = item.optInt("startHour", 0).coerceIn(0, 23),
                         startMinute = item.optInt("startMinute", 0).coerceIn(0, 59),
@@ -303,6 +308,11 @@ class BackupManager(
         } finally {
             try { inputStream.close() } catch (_: Exception) {}
         }
+    }
+
+    private fun localFileExists(reference: String): Boolean {
+        val path = reference.removePrefix("file://")
+        return runCatching { File(path).isFile }.getOrDefault(false)
     }
 
     private fun JSONObject.optNullableString(key: String): String? {
