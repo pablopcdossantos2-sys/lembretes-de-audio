@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.map
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
 data class UserPreferences(
-    val isAppMasterEnabled: Boolean = true,
+    val isAppMasterEnabled: Boolean = false,
     val masterVolumePercent: Int = 100,
     val useAppVolumeOnly: Boolean = false,
     val fadeInEnabled: Boolean = true,
@@ -62,7 +62,7 @@ class UserPreferencesRepository(private val context: Context) {
 
     val preferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
-            isAppMasterEnabled = prefs[Keys.APP_MASTER_ENABLED] ?: true,
+            isAppMasterEnabled = prefs[Keys.APP_MASTER_ENABLED] ?: false,
             masterVolumePercent = prefs[Keys.MASTER_VOLUME_PERCENT] ?: 100,
             useAppVolumeOnly = prefs[Keys.USE_APP_VOLUME_ONLY] ?: false,
             fadeInEnabled = prefs[Keys.FADE_IN_ENABLED] ?: true,
