@@ -2174,7 +2174,7 @@ fun DiagnosticsSettingsContent(
                                 try {
                                     val text = viewModel.getDiagnosticLogsText()
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                    val clip = ClipData.newPlainText(translateText("Logs de Diagnóstico", prefs.appLanguage), text)
+                                    val clip = ClipData.newPlainText(translateText("Logs de Diagnóstico", uiState.preferences.appLanguage), text)
                                     clipboard?.setPrimaryClip(clip)
                                     Toast.makeText(context, "Histórico de logs copiado para a área de transferência!", Toast.LENGTH_SHORT).show()
                                 } catch (_: Throwable) {
