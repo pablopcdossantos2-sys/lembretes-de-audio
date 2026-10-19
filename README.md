@@ -11,7 +11,7 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
    - Intervalos de repetição de 5 a 120 minutos.
    - Seleção de dias da semana (Segunda a Domingo) com detecção e aviso de conflitos de prioridade.
    - **Múltiplos Períodos de Descanso (*Resting Periods*):** Silenciamento automático durante horários de repouso (ex: Almoço 12:00 às 13:00, Pausa para café 16:00 às 16:30).
-   - Políticas de retomada pós-descanso configuráveis (`NEXT_GRID_MARK`, `NEXT_FULL_INTERVAL`, `RETRY_MISSED`).
+   - Políticas de retomada pós-descanso configuráveis (`NEXT_GRID_MARK`, `AT_REST_END`).
    - Modos de reprodução: Sequencial, Aleatório Ponderado por pesos (1 a 5) ou Áudio específico.
    - Suavização de volume (*Fade-in*) global ou personalizada por perfil (0.5s a 10s).
 
@@ -35,7 +35,7 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
 
 ## Arquitetura do Projeto
 
-- **Linguagem:** Kotlin 2.1
+- **Linguagem:** Kotlin 2.2
 - **UI Toolkit:** Jetpack Compose (Material Design 3)
 - **Banco de Dados:** Room Database
 - **Preferências:** Jetpack DataStore Preferences
