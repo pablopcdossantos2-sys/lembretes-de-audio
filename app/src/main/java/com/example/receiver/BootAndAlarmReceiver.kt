@@ -32,7 +32,7 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                 // O Receiver não seleciona nem reproduz áudio: delega o disparo ao
                 // único caminho de reprodução, no serviço em primeiro plano.
                 val serviceIntent = Intent(context, AudioReminderService::class.java).apply {
-                    action = AudioReminderService.ACTION_TRIGGER_ALARM
+                    this.action = AudioReminderService.ACTION_TRIGGER_ALARM
                     putExtra(
                         AudioReminderService.EXTRA_EXPECTED_TIME_MILLIS,
                         intent.getLongExtra(AudioReminderService.EXTRA_EXPECTED_TIME_MILLIS, 0L)
