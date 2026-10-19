@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.util.AudioDiagnosticLogger
 import com.example.ui.i18n.tr
+import com.example.ui.i18n.translateText
 import com.example.util.DiagnosticCategory
 import com.example.util.DiagnosticLevel
 import com.example.util.DiagnosticLogEntry
@@ -406,7 +407,8 @@ fun SettingsScreen(
                         if (result.missingAudioLabels.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                        text = tr("Atenção: Os seguintes áudios não foram encontrados no aparelho e precisarão ser reassociados na biblioteca:\n- ${result.missingAudioLabels.joinToString(")\n- ")}",
+                                text = tr("Atenção: Os seguintes áudios não foram encontrados no aparelho e precisarão ser reassociados na biblioteca:") +
+                                    "\n- " + result.missingAudioLabels.joinToString("\n- "),
                                 color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -2172,7 +2174,7 @@ fun DiagnosticsSettingsContent(
                                 try {
                                     val text = viewModel.getDiagnosticLogsText()
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                    val clip = ClipData.newPlainText(tr("Logs de Diagnóstico"), text)
+                                    val clip = ClipData.newPlainText(translateText("Logs de Diagnóstico", prefs.appLanguage), text)
                                     clipboard?.setPrimaryClip(clip)
                                     Toast.makeText(context, "Histórico de logs copiado para a área de transferência!", Toast.LENGTH_SHORT).show()
                                 } catch (_: Throwable) {
