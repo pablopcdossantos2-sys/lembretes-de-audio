@@ -40,7 +40,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "audio_reminders.db"
                 )
-                    .fallbackToDestructiveMigration()
+                    // Never erase a user's reminders silently when a schema changes.
+                    // Add an explicit Room Migration before increasing the database version.
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
@@ -165,58 +166,56 @@ abstract class AppDatabase : RoomDatabase() {
                 fadeInDurationSeconds = 2.0f
             )
             profileDao.upsertProfileWithRests(daily, emptyList())
-
             }
 
             // Adiciona áudios iniciais reais (arquivos WAV gerados com melodia harmônica)
             val audioDao = database.audioDao()
             if (audioDao.getAllAudios().isEmpty()) {
-            val uriWater = if (bundledFiles.isNotEmpty() && bundledFiles[0].exists()) {
-                "file://${bundledFiles[0].absolutePath}"
-            } else {
-                "tts:beba_agua"
-            }
-            val uriPosture = if (bundledFiles.size > 1 && bundledFiles[1].exists()) {
-                "file://${bundledFiles[1].absolutePath}"
-            } else {
-                "tts:postura_alongamento"
-            }
-            val uriBreath = if (bundledFiles.size > 2 && bundledFiles[2].exists()) {
-                "file://${bundledFiles[2].absolutePath}"
-            } else {
-                "tts:respiracao"
-            }
+                val uriWater = if (bundledFiles.isNotEmpty() && bundledFiles[0].exists()) {
+                    "file://${bundledFiles[0].absolutePath}"
+                } else {
+                    "tts:beba_agua"
+                }
+                val uriPosture = if (bundledFiles.size > 1 && bundledFiles[1].exists()) {
+                    "file://${bundledFiles[1].absolutePath}"
+                } else {
+                    "tts:postura_alongamento"
+                }
+                val uriBreath = if (bundledFiles.size > 2 && bundledFiles[2].exists()) {
+                    "file://${bundledFiles[2].absolutePath}"
+                } else {
+                    "tts:respiracao"
+                }
 
-            val demoAudio1 = AudioItemEntity(
-                uriString = uriWater,
-                label = "Hora de Beber Água",
-                weight = 4,
-                volumePercent = 100,
-                isActive = true,
-                audioType = if (uriWater.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
-                ttsText = "Lembrete: beba um copo d'água e mantenha-se hidratado."
-            )
-            val demoAudio2 = AudioItemEntity(
-                uriString = uriPosture,
-                label = "Alongamento e Postura",
-                weight = 3,
-                volumePercent = 100,
-                isActive = true,
-                audioType = if (uriPosture.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
-                ttsText = "Ajuste sua postura e faça uma pequena pausa para alongar as costas."
-            )
-            val demoAudio3 = AudioItemEntity(
-                uriString = uriBreath,
-                label = "Pausa para Respiração",
-                weight = 2,
-                volumePercent = 90,
-                isActive = true,
-                audioType = if (uriBreath.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
-                ttsText = "Inspire profundamente e relaxe os ombros por alguns segundos."
-            )
-            audioDao.insertAudios(listOf(demoAudio1, demoAudio2, demoAudio3))
+                val demoAudio1 = AudioItemEntity(
+                    uriString = uriWater,
+                    label = "Hora de Beber Água",
+                    weight = 4,
+                    volumePercent = 100,
+                    isActive = true,
+                    audioType = if (uriWater.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
+                    ttsText = "Lembrete: beba um copo d'água e mantenha-se hidratado."
+                )
+                val demoAudio2 = AudioItemEntity(
+                    uriString = uriPosture,
+                    label = "Alongamento e Postura",
+                    weight = 3,
+                    volumePercent = 100,
+                    isActive = true,
+                    audioType = if (uriPosture.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
+                    ttsText = "Ajuste sua postura e faça uma pequena pausa para alongar as costas."
+                )
+                val demoAudio3 = AudioItemEntity(
+                    uriString = uriBreath,
+                    label = "Pausa para Respiração",
+                    weight = 2,
+                    volumePercent = 90,
+                    isActive = true,
+                    audioType = if (uriBreath.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
+                    ttsText = "Inspire profundamente e relaxe os ombros por alguns segundos."
+                )
+                audioDao.insertAudios(listOf(demoAudio1, demoAudio2, demoAudio3))
             }
-        }
         }
     }
-
+}
