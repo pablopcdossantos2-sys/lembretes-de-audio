@@ -45,6 +45,9 @@ jobs:
             echo "sdkmanager não encontrado em $ANDROID_HOME/cmdline-tools" >&2
             exit 1
           fi
+          # sdkmanager closes stdin after accepting licenses; without pipefail, its
+          # own exit code remains authoritative while 'yes' may exit with SIGPIPE.
+          set +o pipefail
           yes | "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Set up Gradle
