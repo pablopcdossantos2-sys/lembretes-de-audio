@@ -287,12 +287,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateAudio(audio: AudioItem) {
+    fun updateAudio(audio: AudioItem, intervalMinutes: Int? = null) {
         viewModelScope.launch {
             database.audioDao().updateAudio(AudioItemEntity.fromDomain(audio))
+
+            if (intervalMinutes != null) {
+                val profiles = database.profileDao().getAllProfilesWithRests()
+                val specificallyLinkedProfiles = profiles.filter { item ->
+                    item.profile.specificAudioId == audio.id ||
+                        item.profile.audioIdsCsv.split(",").mapNotNull { it.trim().toLongOrNull() }.contains(audio.id)
+                }
+                // An empty audioIdsCsv with no specificAudioId means the profile schedules the library as a whole.
+                val sharedProfiles = profiles.filter { item ->
+                    item.profile.specificAudioId == null && item.profile.audioIdsCsv.isBlank()
+                }
+                val targets = (specificallyLinkedProfiles + sharedProfiles).distinctBy { it.profile.id }
+
+                if (targets.isEmpty()) {
+                    _userMessage.emit(
+                        "Áudio salvo. Não há perfil vinculado a este lembrete para alterar a frequência."
+                    )
+                } else {
+                    targets.forEach { item ->
+                        database.profileDao().updateProfile(item.profile.copy(intervalMinutes = intervalMinutes.coerceIn(5, 120)))
+                    }
+                    _userMessage.emit(
+                        "Frequência atualizada para ${intervalMinutes.coerceIn(5, 120)} minutos nos perfis que executam este lembrete."
+                    )
+                }
+            }
+
             if (uiState.value.preferences.isAppMasterEnabled) {
                 AudioReminderService.startOrRefresh(getApplication())
             }
+            com.example.worker.ReminderWorkScheduler.rescheduleNextReminder(getApplication())
         }
     }
 
