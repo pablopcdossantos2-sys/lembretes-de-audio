@@ -1,5 +1,9 @@
 # Lembretes em Áudio (Android)
 
+*Read this in other languages: [English](README-en.md)*
+
+---
+
 Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose** (Material Design 3) para reprodução periódica de áudios, gravações de voz e lembretes sonoros em intervalos configuráveis, respeitando múltiplos períodos de descanso, horários silenciosos, rotinas por dia da semana e o estado do dispositivo.
 
 ---
@@ -42,3 +46,12 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
 - **Preferências:** Jetpack DataStore Preferences
 - **Segundo Plano:** WorkManager, Foreground Service, BroadcastReceivers
 - **Áudio:** Android MediaPlayer, AudioFocusManager, TextToSpeech
+
+
+## 👤 Autoria e desenvolvimento
+
+Lembretes em Áudio é um aplicativo Android nativo, desenvolvido de forma independente por Pablo Phillipe Cândido dos Santos, para agendar e reproduzir lembretes sonoros, gravações de voz e mensagens de texto para fala em rotinas configuráveis.
+
+O desenvolvimento contou com ferramentas de inteligência artificial generativa como recurso auxiliar, mantendo-se sob responsabilidade do autor a concepção, implementação, integração e verificação do projeto.
+
+Currículo Lattes: [http://lattes.cnpq.br/9500873674712528](http://lattes.cnpq.br/9500873674712528)
