@@ -50,17 +50,18 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val appContext = context.applicationContext
-                val instance = Room.databaseBuilder(
-                    appContext,
-                    AppDatabase::class.java,
-                    "audio_reminders.db"
-                )
-                    .addMigrations(MIGRATION_1_2)
-                    .addCallback(DatabaseCallback(appContext))
-                    .build()
-                INSTANCE = instance
-                instance
+                INSTANCE ?: run {
+                    val appContext = context.applicationContext
+                    Room.databaseBuilder(
+                        appContext,
+                        AppDatabase::class.java,
+                        "audio_reminders.db"
+                    )
+                        .addMigrations(MIGRATION_1_2)
+                        .addCallback(DatabaseCallback(appContext))
+                        .build()
+                        .also { INSTANCE = it }
+                }
             }
         }
 
@@ -79,16 +80,38 @@ abstract class AppDatabase : RoomDatabase() {
             val audioDao = database.audioDao()
 
             if (context != null) {
+                // Os arquivos de chime são recursos de fallback; não substituem itens TTS da biblioteca.
                 try {
-                    val files = com.example.util.AudioSampleGenerator.ensureDefaultAudioFiles(context)
-                    val currentAudios = audioDao.getAllAudios()
-                    for (aud in currentAudios) {
-                        if (aud.uriString == "tts:beba_agua" && files.isNotEmpty()) {
-                            audioDao.updateAudio(aud.copy(uriString = "file://${files[0].absolutePath}", audioType = "AUDIO_FILE"))
-                        } else if (aud.uriString == "tts:postura_alongamento" && files.size > 1) {
-                            audioDao.updateAudio(aud.copy(uriString = "file://${files[1].absolutePath}", audioType = "AUDIO_FILE"))
-                        } else if (aud.uriString == "tts:respiracao" && files.size > 2) {
-                            audioDao.updateAudio(aud.copy(uriString = "file://${files[2].absolutePath}", audioType = "AUDIO_FILE"))
+                    val bundledFiles = com.example.util.AudioSampleGenerator
+                        .ensureDefaultAudioFiles(context)
+                    val generatedTtsUris = bundledFiles.mapIndexedNotNull { index, file ->
+                        val ttsKey = when (index) {
+                            0 -> "tts:beba_agua"
+                            1 -> "tts:postura_alongamento"
+                            2 -> "tts:respiracao"
+                            else -> null
+                        }
+                        ttsKey?.let { "file://${file.absolutePath}" to it }
+                    }.toMap()
+
+                    if (generatedTtsUris.isNotEmpty()) {
+                        database.withTransaction {
+                            audioDao.getAllAudios().forEach { audio ->
+                                val originalTtsUri = generatedTtsUris[audio.uriString]
+                                // Reverte apenas os chimes gerados pelo app que ainda conservam o texto TTS.
+                                if (
+                                    originalTtsUri != null &&
+                                    audio.audioType == "AUDIO_FILE" &&
+                                    !audio.ttsText.isNullOrBlank()
+                                ) {
+                                    audioDao.updateAudio(
+                                        audio.copy(
+                                            uriString = originalTtsUri,
+                                            audioType = "TEXT_TO_SPEECH"
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 } catch (_: Throwable) {}
@@ -119,30 +142,18 @@ abstract class AppDatabase : RoomDatabase() {
             val profileDao = database.profileDao()
             val audioDao = database.audioDao()
 
-            val bundledFiles = if (context != null) {
-                try {
-                    com.example.util.AudioSampleGenerator.ensureDefaultAudioFiles(context)
-                } catch (_: Throwable) {
-                    emptyList()
-                }
-            } else emptyList()
-
             // Serialize seeding so concurrent startup paths cannot create duplicate samples.
             database.withTransaction {
                 // Preserva áudios existentes; em uma instalação nova, cria apenas um exemplo.
                 if (audioDao.getAllAudios().isEmpty()) {
-                    val demoAudioUri = if (bundledFiles.isNotEmpty() && bundledFiles[0].exists()) {
-                        "file://${bundledFiles[0].absolutePath}"
-                    } else {
-                        "tts:beba_agua"
-                    }
+                    val demoAudioUri = "tts:beba_agua"
                     val demoAudio = AudioItemEntity(
                         uriString = demoAudioUri,
                         label = "Hora de Beber Água",
                         weight = 4,
                         volumePercent = 100,
                         isActive = true,
-                        audioType = if (demoAudioUri.startsWith("file:")) "AUDIO_FILE" else "TEXT_TO_SPEECH",
+                        audioType = "TEXT_TO_SPEECH",
                         ttsText = "Lembrete: beba um copo d'água e mantenha-se hidratado."
                     )
                     audioDao.insertAudio(demoAudio)

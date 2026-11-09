@@ -22,7 +22,7 @@ A native Android application built with **Kotlin** and **Jetpack Compose** (Mate
 2. **Audio Library**
    - **Microphone recording:** Integrated recorder with real-time waveform visualization, timer, pause/resume, and preview playback.
    - **File import:** Local MP3, WAV, M4A, and OGG files through the system file picker.
-   - **Text-to-Speech (TTS):** Native Android speech synthesis; available voices and languages depend on the device.
+   - **Text-to-Speech (TTS):** Native Android speech synthesis at playback time; the text is spoken but does not itself create an audio file. Available voices and languages depend on the device.
    - Per-item volume (0–100%) and random-selection weight.
 
 3. **Background Scheduling and Device State**
@@ -34,7 +34,7 @@ A native Android application built with **Kotlin** and **Jetpack Compose** (Mate
 
 4. **Backup and Portability**
    - Export and import of settings, profiles, rest periods, audio metadata, and reminders as JSON.
-   - **Current limitation:** JSON backups do not contain local audio file bytes. After importing on another device, audio files must be copied or imported again; references to missing files are disabled to prevent playback failures.
+   - Eligible local audio files are embedded in the JSON as Base64 (current limit: 10 MB per file). Larger or inaccessible files may be exported only as references and can be missing on another device.
 
 5. **Interface Languages**
    - Language selector for Brazilian Portuguese (PT-BR), English, and Spanish.
@@ -47,7 +47,7 @@ A native Android application built with **Kotlin** and **Jetpack Compose** (Mate
 - **Database:** Room
 - **Preferences:** Jetpack DataStore Preferences
 - **Background execution:** WorkManager, foreground service, broadcast receivers
-- **Audio:** Android MediaPlayer, AudioFocusManager, TextToSpeech
+- **Audio:** Android MediaPlayer, audio focus management inside `AudioPlayerManager`, TextToSpeech
 
 ## 👤 Authorship and development
 

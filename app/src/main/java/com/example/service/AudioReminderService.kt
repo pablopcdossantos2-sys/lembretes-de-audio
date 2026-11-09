@@ -38,6 +38,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicBoolean
 
 class AudioReminderService : Service() {
 
@@ -89,6 +90,7 @@ class AudioReminderService : Service() {
     private lateinit var database: AppDatabase
     private lateinit var preferencesRepo: UserPreferencesRepository
     private lateinit var playerManager: AudioPlayerManager
+    private val alarmExecutionInProgress = AtomicBoolean(false)
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -168,12 +170,32 @@ class AudioReminderService : Service() {
     }
 
     private fun handleAlarmTrigger(expectedMillis: Long) {
+        // O próximo alarme é pré-agendado, mas nunca permitimos duas reproduções simultâneas.
+        if (!alarmExecutionInProgress.compareAndSet(false, true)) {
+            AudioDiagnosticLogger.log(
+                level = DiagnosticLevel.WARN,
+                category = DiagnosticCategory.ALARM,
+                message = "Disparo recebido durante outra reprodução; mantendo a execução atual"
+            )
+            return
+        }
+
         val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
-        val wakeLock = powerManager?.newWakeLock(
-            android.os.PowerManager.PARTIAL_WAKE_LOCK,
-            "AudioReminder:PlaybackWakeLock"
-        )?.apply {
-            acquire(180_000L)
+        val wakeLock = try {
+            powerManager?.newWakeLock(
+                android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                "AudioReminder:PlaybackWakeLock"
+            )?.apply {
+                acquire(180_000L)
+            }
+        } catch (error: Exception) {
+            AudioDiagnosticLogger.log(
+                level = DiagnosticLevel.WARN,
+                category = DiagnosticCategory.SERVICE,
+                message = "Não foi possível adquirir o WakeLock; o alarme continuará sem ele",
+                details = error.message
+            )
+            null
         }
 
         serviceScope.launch {
@@ -188,6 +210,18 @@ class AudioReminderService : Service() {
                     )
                     stopSelf()
                     return@launch
+                }
+
+                // Preserva a cadeia de alarmes antes de iniciar uma reprodução potencialmente longa.
+                try {
+                    refreshScheduleAndNotification()
+                } catch (scheduleError: Exception) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.ERROR,
+                        category = DiagnosticCategory.ALARM,
+                        message = "Falha ao pré-agendar o próximo lembrete",
+                        details = scheduleError.message
+                    )
                 }
 
                 val now = ZonedDateTime.now()
@@ -395,9 +429,29 @@ class AudioReminderService : Service() {
                     } catch (_: Exception) {}
                 }
 
-                // Agenda o próximo alarme com precisão
+                // Atualiza também o estado/horário após concluir a reprodução.
                 refreshScheduleAndNotification()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AudioDiagnosticLogger.log(
+                    level = DiagnosticLevel.ERROR,
+                    category = DiagnosticCategory.SERVICE,
+                    message = "Erro ao processar o disparo; tentando preservar o próximo alarme",
+                    details = error.stackTraceToString()
+                )
+                try {
+                    refreshScheduleAndNotification()
+                } catch (scheduleError: Exception) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.ERROR,
+                        category = DiagnosticCategory.ALARM,
+                        message = "Não foi possível recuperar o agendamento após uma falha",
+                        details = scheduleError.message
+                    )
+                }
             } finally {
+                alarmExecutionInProgress.set(false)
                 try {
                     if (wakeLock?.isHeld == true) {
                         wakeLock.release()

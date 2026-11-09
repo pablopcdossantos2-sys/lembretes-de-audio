@@ -10,6 +10,7 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,8 +30,9 @@ class AudioRecorderHelper(private val context: Context) {
         const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     }
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var recordingJob: Job? = null
+    private var stopFinalizationJob: Job? = null
 
     // AudioRecord instance for real-time PCM capture
     private var audioRecord: AudioRecord? = null
@@ -74,7 +76,14 @@ class AudioRecorderHelper(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun startRecording(outputFile: File): Boolean {
         try {
-            stopRecording()
+            if (stopFinalizationJob?.isActive == true) {
+                Log.w(TAG, "Previous recording is still being finalized")
+                return false
+            }
+            if (isRecording || recordingJob != null || fallbackMediaRecorder != null) {
+                Log.w(TAG, "A recording session is already active or being stopped")
+                return false
+            }
             currentOutputFile = outputFile
             totalPcmBytesWritten = 0L
             frequencyAnalyzer.reset()
@@ -97,75 +106,86 @@ class AudioRecorderHelper(private val context: Context) {
             }
 
             if (record != null && record.state == AudioRecord.STATE_INITIALIZED) {
-                audioRecord = record
-                isUsingFallback = false
-
-                // Prepare WAV output file
-                val fos = FileOutputStream(outputFile)
-                writeWavHeader(fos, 0) // write preliminary 44-byte header
-
-                record.startRecording()
-                isRecording = true
-                isPaused = false
-
-                val shortBuffer = ShortArray(512)
-                val byteBuffer = ByteArray(1024)
-
-                recordingJob = scope.launch {
-                    var lastVisualizerUpdate = 0L
-                    try {
-                        while (isActive && isRecording) {
-                            if (isPaused) {
-                                val idle = frequencyAnalyzer.idleResult()
-                                _frequencyData.value = idle.frequencyBands
-                                _waveformData.value = idle.waveformPoints
-                                _decibels.value = -60f
-                                kotlinx.coroutines.delay(80)
-                                continue
-                            }
-
-                            val shortsRead = record.read(shortBuffer, 0, shortBuffer.size)
-                            if (shortsRead > 0) {
-                                // 1. Convert to little-endian bytes and write to WAV file
-                                for (i in 0 until shortsRead) {
-                                    val s = shortBuffer[i].toInt()
-                                    byteBuffer[i * 2] = (s and 0xFF).toByte()
-                                    byteBuffer[i * 2 + 1] = ((s shr 8) and 0xFF).toByte()
-                                }
-                                val bytesToWrite = shortsRead * 2
-                                fos.write(byteBuffer, 0, bytesToWrite)
-                                totalPcmBytesWritten += bytesToWrite
-
-                                // 2. Calculate peak amplitude
-                                var maxAmp = 0
-                                for (i in 0 until shortsRead) {
-                                    val a = abs(shortBuffer[i].toInt())
-                                    if (a > maxAmp) maxAmp = a
-                                }
-                                _currentAmplitude.value = maxAmp
-
-                                // 3. Compute real-time frequency spectrum & oscilloscope data
-                                // Throttle analysis to ~30 FPS (every 33ms) to eliminate GC churn and UI recomposition lag
-                                val nowTime = android.os.SystemClock.uptimeMillis()
-                                if (nowTime - lastVisualizerUpdate >= 33L) {
-                                    lastVisualizerUpdate = nowTime
-                                    val result = frequencyAnalyzer.analyze(shortBuffer, shortsRead)
-                                    _frequencyData.value = result.frequencyBands
-                                    _waveformData.value = result.waveformPoints
-                                    _decibels.value = result.decibels
-                                    _peakFrequencyHz.value = result.peakFrequencyHz
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error in PCM recording loop", e)
-                    } finally {
-                        try { fos.flush() } catch (_: Exception) {}
-                        try { fos.close() } catch (_: Exception) {}
-                    }
+                val fos = try {
+                    FileOutputStream(outputFile)
+                } catch (error: Exception) {
+                    try { record.release() } catch (_: Exception) {}
+                    throw error
                 }
-                return true
+                try {
+                    writeWavHeader(fos, 0)
+                    record.startRecording()
+                    check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                        "AudioRecord não iniciou a captura."
+                    }
+
+                    audioRecord = record
+                    isUsingFallback = false
+                    isRecording = true
+                    isPaused = false
+
+                    val shortBuffer = ShortArray(512)
+                    val byteBuffer = ByteArray(1024)
+
+                    recordingJob = scope.launch {
+                        var lastVisualizerUpdate = 0L
+                        try {
+                            while (isActive && isRecording) {
+                                if (isPaused) {
+                                    val idle = frequencyAnalyzer.idleResult()
+                                    _frequencyData.value = idle.frequencyBands
+                                    _waveformData.value = idle.waveformPoints
+                                    _decibels.value = -60f
+                                    kotlinx.coroutines.delay(80)
+                                    continue
+                                }
+
+                                val shortsRead = record.read(shortBuffer, 0, shortBuffer.size)
+                                if (shortsRead > 0) {
+                                    for (i in 0 until shortsRead) {
+                                        val sample = shortBuffer[i].toInt()
+                                        byteBuffer[i * 2] = (sample and 0xFF).toByte()
+                                        byteBuffer[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
+                                    }
+                                    val bytesToWrite = shortsRead * 2
+                                    fos.write(byteBuffer, 0, bytesToWrite)
+                                    totalPcmBytesWritten += bytesToWrite
+
+                                    var maxAmp = 0
+                                    for (i in 0 until shortsRead) {
+                                        val amplitude = abs(shortBuffer[i].toInt())
+                                        if (amplitude > maxAmp) maxAmp = amplitude
+                                    }
+                                    _currentAmplitude.value = maxAmp
+
+                                    val nowTime = android.os.SystemClock.uptimeMillis()
+                                    if (nowTime - lastVisualizerUpdate >= 33L) {
+                                        lastVisualizerUpdate = nowTime
+                                        val result = frequencyAnalyzer.analyze(shortBuffer, shortsRead)
+                                        _frequencyData.value = result.frequencyBands
+                                        _waveformData.value = result.waveformPoints
+                                        _decibels.value = result.decibels
+                                        _peakFrequencyHz.value = result.peakFrequencyHz
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in PCM recording loop", e)
+                        } finally {
+                            try { fos.flush() } catch (_: Exception) {}
+                            try { fos.close() } catch (_: Exception) {}
+                        }
+                    }
+                    return true
+                } catch (error: Exception) {
+                    try { fos.close() } catch (_: Exception) {}
+                    try { record.stop() } catch (_: Exception) {}
+                    try { record.release() } catch (_: Exception) {}
+                    outputFile.delete()
+                    throw error
+                }
             } else {
+                try { record?.release() } catch (_: Exception) {}
                 Log.w(TAG, "AudioRecord state not initialized, using MediaRecorder fallback")
                 return startFallbackMediaRecorder(outputFile)
             }
@@ -177,25 +197,26 @@ class AudioRecorderHelper(private val context: Context) {
     }
 
     private fun startFallbackMediaRecorder(outputFile: File): Boolean {
+        val fallbackOutputFile = if (outputFile.extension.equals("wav", ignoreCase = true)) {
+            File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.m4a")
+        } else {
+            outputFile
+        }
+        var recorder: MediaRecorder? = null
+
         return try {
-            // MediaRecorder com MPEG_4/AAC produz container MP4, não WAV.
-            val fallbackOutputFile = if (outputFile.extension.equals("wav", ignoreCase = true)) {
-                File(outputFile.parentFile, "${outputFile.nameWithoutExtension}.m4a")
-            } else {
-                outputFile
-            }
             fallbackOutputFile.parentFile?.mkdirs()
             fallbackOutputFile.delete()
-            currentOutputFile = fallbackOutputFile
 
-            val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val createdRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 MediaRecorder(context)
             } else {
                 @Suppress("DEPRECATION")
                 MediaRecorder()
             }
+            recorder = createdRecorder
 
-            recorder.apply {
+            createdRecorder.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -207,15 +228,17 @@ class AudioRecorderHelper(private val context: Context) {
             }
 
             fallbackMediaRecorder = recorder
+            currentOutputFile = fallbackOutputFile
             isUsingFallback = true
             isRecording = true
             isPaused = false
 
             // Periodic sampler for amplitude and synthetic voice frequency spectrum
+            val activeRecorder = createdRecorder
             recordingJob = scope.launch {
                 while (isActive && isRecording) {
                     if (!isPaused) {
-                        val maxAmp = try { recorder.maxAmplitude } catch (_: Exception) { 0 }
+                        val maxAmp = try { activeRecorder.maxAmplitude } catch (_: Exception) { 0 }
                         _currentAmplitude.value = maxAmp
                         val normalized = (maxAmp / 32767f).coerceIn(0.04f, 1.0f)
                         val result = frequencyAnalyzer.simulateFromAmplitude(normalized)
@@ -230,6 +253,11 @@ class AudioRecorderHelper(private val context: Context) {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Fallback MediaRecorder failed", e)
+            try { recorder?.reset() } catch (_: Exception) {}
+            try { recorder?.release() } catch (_: Exception) {}
+            fallbackOutputFile.delete()
+            fallbackMediaRecorder = null
+            isRecording = false
             release()
             false
         }
@@ -253,51 +281,77 @@ class AudioRecorderHelper(private val context: Context) {
         return true
     }
 
+    /**
+     * Solicita a parada do gravador e finaliza o arquivo em IO depois que o escritor
+     * terminar. O cabeçalho WAV nunca é atualizado enquanto o fluxo ainda está aberto.
+     */
     fun stopRecording(): Boolean {
-        if (!isRecording) return false
+        if (!isRecording && recordingJob == null && fallbackMediaRecorder == null) return false
+        if (stopFinalizationJob?.isActive == true) return true
 
+        val wasRecording = isRecording
         isRecording = false
         isPaused = false
 
-        recordingJob?.cancel()
-        recordingJob = null
+        val recordToStop = audioRecord
+        val fallbackToStop = fallbackMediaRecorder
+        val writerJob = recordingJob
+        val outputFile = currentOutputFile
 
-        if (audioRecord != null) {
-            try {
-                audioRecord?.stop()
-                audioRecord?.release()
-            } catch (e: Exception) {
-                Log.w(TAG, "Error stopping AudioRecord", e)
+        // AudioRecord.stop() desbloqueia read(); não cancelamos o escritor antes do finally/close.
+        try {
+            if (recordToStop?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                recordToStop.stop()
             }
-            audioRecord = null
+        } catch (e: Exception) {
+            Log.w(TAG, "Error signaling AudioRecord stop", e)
+        }
+        try {
+            fallbackToStop?.stop()
+        } catch (e: Exception) {
+            // MediaRecorder pode lançar quando a gravação ainda não produziu frames.
+            Log.w(TAG, "Error stopping MediaRecorder", e)
+        }
 
-            // Update WAV header with total file sizes
-            currentOutputFile?.let { file ->
-                try {
-                    updateWavHeader(file, totalPcmBytesWritten)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error updating WAV header", e)
+        stopFinalizationJob = scope.launch {
+            try {
+                writerJob?.join()
+                try { recordToStop?.release() } catch (e: Exception) {
+                    Log.w(TAG, "Error releasing AudioRecord", e)
                 }
+                try {
+                    fallbackToStop?.reset()
+                    fallbackToStop?.release()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error releasing MediaRecorder", e)
+                }
+
+                if (recordToStop != null && outputFile != null) {
+                    try {
+                        updateWavHeader(outputFile, totalPcmBytesWritten)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error updating WAV header", e)
+                    }
+                }
+            } finally {
+                if (audioRecord === recordToStop) audioRecord = null
+                if (fallbackMediaRecorder === fallbackToStop) fallbackMediaRecorder = null
+                if (recordingJob === writerJob) recordingJob = null
+                val idle = frequencyAnalyzer.idleResult()
+                _frequencyData.value = idle.frequencyBands
+                _waveformData.value = idle.waveformPoints
+                _decibels.value = -60f
+                _currentAmplitude.value = 0
             }
         }
+        return wasRecording || writerJob != null || fallbackToStop != null
+    }
 
-        if (fallbackMediaRecorder != null) {
-            try {
-                fallbackMediaRecorder?.stop()
-                fallbackMediaRecorder?.reset()
-                fallbackMediaRecorder?.release()
-            } catch (e: Exception) {
-                Log.w(TAG, "Error stopping MediaRecorder", e)
-            }
-            fallbackMediaRecorder = null
-        }
-
-        _frequencyData.value = frequencyAnalyzer.idleResult().frequencyBands
-        _waveformData.value = frequencyAnalyzer.idleResult().waveformPoints
-        _decibels.value = -60f
-        _currentAmplitude.value = 0
-
-        return true
+    /** Aguarda o fechamento efetivo do arquivo antes de permitir cópia ou prévia. */
+    suspend fun stopRecordingAndAwait(): Boolean {
+        val requested = stopRecording()
+        stopFinalizationJob?.join()
+        return requested
     }
 
     fun getMaxAmplitude(): Int {
@@ -312,8 +366,25 @@ class AudioRecorderHelper(private val context: Context) {
         return File(dir, "lembrete_${System.currentTimeMillis()}.wav")
     }
 
+    /**
+     * Interrompe uma gravação abandonada e remove o arquivo temporário somente
+     * depois que o escritor fechar o fluxo. O arquivo persistente é gerenciado pelo ViewModel.
+     */
     fun release() {
         stopRecording()
+        scope.launch {
+            stopFinalizationJob?.join()
+            val file = currentOutputFile ?: return@launch
+            try {
+                val temporaryDir = File(context.filesDir, "lembretes_audio").canonicalFile
+                val source = file.canonicalFile
+                if (source.parentFile == temporaryDir) {
+                    source.delete()
+                }
+            } catch (error: Exception) {
+                Log.w(TAG, "Could not remove abandoned temporary recording", error)
+            }
+        }
     }
 
     /**

@@ -191,6 +191,7 @@ fun RecordReminderScreen(
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
+    var isFinalizing by remember { mutableStateOf(false) }
 
     // Cleanup when leaving screen
     DisposableEffect(Unit) {
@@ -500,9 +501,15 @@ fun RecordReminderScreen(
                                 // Stop / Finish Button
                                 Button(
                                     onClick = {
-                                        recorderHelper.stopRecording()
-                                        currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
-                                        recordingStatus = RecordingStatus.FINISHED
+                                        if (!isFinalizing) {
+                                            isFinalizing = true
+                                            scope.launch {
+                                                recorderHelper.stopRecordingAndAwait()
+                                                currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
+                                                recordingStatus = RecordingStatus.FINISHED
+                                                isFinalizing = false
+                                            }
+                                        }
                                     },
                                     modifier = Modifier
                                         .size(72.dp)
@@ -549,9 +556,15 @@ fun RecordReminderScreen(
                                 // Stop / Finish Button
                                 Button(
                                     onClick = {
-                                        recorderHelper.stopRecording()
-                                        currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
-                                        recordingStatus = RecordingStatus.FINISHED
+                                        if (!isFinalizing) {
+                                            isFinalizing = true
+                                            scope.launch {
+                                                recorderHelper.stopRecordingAndAwait()
+                                                currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
+                                                recordingStatus = RecordingStatus.FINISHED
+                                                isFinalizing = false
+                                            }
+                                        }
                                     },
                                     modifier = Modifier
                                         .size(72.dp)
@@ -841,7 +854,7 @@ fun RecordReminderScreen(
                             }
                         }
 
-                        if (isSaving) {
+                        if (isSaving || isFinalizing) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
 
@@ -862,13 +875,19 @@ fun RecordReminderScreen(
                                     onSucesso = {
                                         isSaving = false
                                         scope.launch {
-                                            snackbarHostState.showSnackbar("Lembrete salvo com sucesso no banco Room!")
+                                            snackbarHostState.showSnackbar("Lembrete salvo com sucesso!")
+                                            onNavigateBack()
                                         }
-                                        onNavigateBack()
+                                    },
+                                    onErro = { mensagem ->
+                                        isSaving = false
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Não foi possível salvar: $mensagem")
+                                        }
                                     }
                                 )
                             },
-                            enabled = !isSaving && currentFile != null,
+                            enabled = !isSaving && !isFinalizing && currentFile != null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp)
