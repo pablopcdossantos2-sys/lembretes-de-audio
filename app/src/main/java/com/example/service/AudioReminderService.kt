@@ -250,12 +250,12 @@ class AudioReminderService : Service() {
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.WARN,
                     category = DiagnosticCategory.ALARM,
-                    message = "Lembrete com atraso excessivo de \${(nowMillis - expectedMillis) / 1000}s",
-                    details = "Esperado às \${missedTime.format(timeFormatter)}"
+                    message = "Lembrete com atraso excessivo de ${(nowMillis - expectedMillis) / 1000}s",
+                    details = "Esperado às ${missedTime.format(timeFormatter)}"
                 )
                 showAlertNotification(
                     title = "Lembrete perdido",
-                    message = "Lembrete perdido às \${missedTime.format(timeFormatter)}"
+                    message = "Lembrete perdido às ${missedTime.format(timeFormatter)}"
                 )
                 refreshScheduleAndNotification()
                 return
@@ -263,7 +263,7 @@ class AudioReminderService : Service() {
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.ALARM,
-                    message = "Alarme executado com \${(nowMillis - expectedMillis) / 1000}s de tolerância do sistema",
+                    message = "Alarme executado com ${(nowMillis - expectedMillis) / 1000}s de tolerância do sistema",
                     details = "Disparo mantido para audibilidade garantida"
                 )
             }
@@ -276,7 +276,7 @@ class AudioReminderService : Service() {
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.SERVICE,
-                    message = "Lembrete ignorado: modo soneca ativo até \${snoozeTime.format(timeFormatter)}"
+                    message = "Lembrete ignorado: modo soneca ativo até ${snoozeTime.format(timeFormatter)}"
                 )
                 refreshScheduleAndNotification()
                 return
@@ -371,7 +371,7 @@ class AudioReminderService : Service() {
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.ALARM,
-                    message = "Nenhum agendamento independente corresponde ao horário \${scheduledTime.format(timeFormatter)}"
+                    message = "Nenhum agendamento independente corresponde ao horário ${scheduledTime.format(timeFormatter)}"
                 )
                 refreshScheduleAndNotification()
                 return
@@ -387,7 +387,7 @@ class AudioReminderService : Service() {
                     AudioDiagnosticLogger.log(
                         level = DiagnosticLevel.WARN,
                         category = DiagnosticCategory.PLAYBACK,
-                        message = "Perfil sem áudio elegível: \${profile.name}"
+                        message = "Perfil sem áudio elegível: ${profile.name}"
                     )
                     continue
                 }
@@ -413,7 +413,7 @@ class AudioReminderService : Service() {
                     AudioDiagnosticLogger.log(
                         level = DiagnosticLevel.ERROR,
                         category = DiagnosticCategory.PLAYBACK,
-                        message = "Falha ao reproduzir o lembrete \${profile.name}",
+                        message = "Falha ao reproduzir o lembrete ${profile.name}",
                         details = playbackError.stackTraceToString()
                     )
                 }

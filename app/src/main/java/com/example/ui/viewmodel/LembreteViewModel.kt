@@ -8,13 +8,9 @@ import androidx.room.withTransaction
 import com.example.data.db.AppDatabase
 import com.example.data.db.AudioItemEntity
 import com.example.data.db.ProfileEntity
-import com.example.data.db.ProfileWithRestingPeriods
 import com.example.data.db.ReminderEntity
 import com.example.worker.ReminderWorkScheduler
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -26,14 +22,6 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
 
     // Todos os consumidores compartilham o mesmo singleton Room.
     private val database = AppDatabase.getDatabase(application)
-
-    val profilesState: StateFlow<List<ProfileWithRestingPeriods>> =
-        database.profileDao().getAllProfilesWithRestsFlow()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
 
     fun salvarLembreteGravado(
         titulo: String,

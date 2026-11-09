@@ -56,3 +56,6 @@ Audio Reminders is a native Android application independently developed by Pablo
 Generative artificial intelligence tools were used as auxiliary resources during development. The author remains responsible for the project's conception, implementation, integration, and verification.
 
 Lattes CV: [http://lattes.cnpq.br/9500873674712528](http://lattes.cnpq.br/9500873674712528)
+
+
+**Recording schedules:** each recording has its own profile, with an independent interval and rest period. When multiple reminders are due at the same instant, their audio is played sequentially; profile priority does not suppress other reminders.

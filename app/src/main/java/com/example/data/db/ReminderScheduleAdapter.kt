@@ -41,7 +41,7 @@ object ReminderScheduleAdapter {
                 ?.takeIf { it.isFile && it.canRead() }
             val uri = file?.let { Uri.fromFile(it).toString() }
                 ?: reminder.audioUri
-                ?: "tts:\${reminder.title}"
+                ?: "tts:${reminder.title}"
 
             val audioType = if (uri.startsWith("tts:")) {
                 AudioType.TEXT_TO_SPEECH
