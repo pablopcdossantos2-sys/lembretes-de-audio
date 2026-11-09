@@ -39,7 +39,6 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
         titulo: String,
         arquivoAudio: File,
         periodicidadeMinutos: Int,
-        selectedProfileId: Long? = null,
         hasRestPeriod: Boolean = false,
         horaInicio: Int = 0,
         minutoInicio: Int = 0,
@@ -99,63 +98,43 @@ class LembreteViewModel(application: Application) : AndroidViewModel(application
                         )
                         val audioId = database.audioDao().insertAudio(audioEntity)
 
-                        val targetProfileId: Long =
-                            if (selectedProfileId != null && selectedProfileId > 0L) {
-                                val selected = database.profileDao()
-                                    .getProfileWithRestsById(selectedProfileId)
-                                    ?: throw IllegalStateException(
-                                        "O perfil selecionado não existe mais. Selecione outro perfil."
-                                    )
-
-                                // CSV vazio significa todos os áudios; não o transforme em lista restrita.
-                                val currentCsv = selected.profile.audioIdsCsv
-                                if (currentCsv.isNotBlank()) {
-                                    val currentIds = currentCsv.split(',')
-                                        .mapNotNull { it.trim().toLongOrNull() }
-                                    if (audioId !in currentIds) {
-                                        val updatedCsv = (currentIds + audioId).joinToString(",")
-                                        database.profileDao().updateProfile(
-                                            selected.profile.copy(audioIdsCsv = updatedCsv)
-                                        )
-                                    }
-                                }
-                                selectedProfileId
-                            } else {
-                                val profile = ProfileEntity(
-                                    name = titulo,
-                                    isEnabled = true,
-                                    priority = 20,
-                                    daysOfWeekCsv = "1,2,3,4,5,6,7",
-                                    startHour = 0,
-                                    startMinute = 0,
-                                    endHour = 23,
-                                    endMinute = 59,
-                                    intervalMinutes = periodicidadeMinutos.coerceIn(5, 120),
-                                    playbackOrder = "SPECIFIC",
-                                    specificAudioId = audioId,
-                                    audioIdsCsv = audioId.toString(),
-                                    resumePolicy = "NEXT_GRID_MARK",
-                                    fadeInOverrideEnabled = false,
-                                    fadeInDurationSeconds = 2.0f
+                        // Cada gravação recebe um perfil exclusivo, sem herdar
+                        // periodicidade, descanso ou seleção de áudio de outro perfil.
+                        val profile = ProfileEntity(
+                            name = titulo,
+                            isEnabled = true,
+                            priority = 20,
+                            daysOfWeekCsv = "1,2,3,4,5,6,7",
+                            startHour = 0,
+                            startMinute = 0,
+                            endHour = 23,
+                            endMinute = 59,
+                            intervalMinutes = periodicidadeMinutos.coerceIn(5, 120),
+                            playbackOrder = "SPECIFIC",
+                            specificAudioId = audioId,
+                            audioIdsCsv = audioId.toString(),
+                            resumePolicy = "NEXT_GRID_MARK",
+                            fadeInOverrideEnabled = false,
+                            fadeInDurationSeconds = 2.0f
+                        )
+                        val rests = if (
+                            hasRestPeriod &&
+                            (horaInicio != horaFim || minutoInicio != minutoFim)
+                        ) {
+                            listOf(
+                                com.example.data.db.RestingPeriodEntity(
+                                    label = "Descanso",
+                                    startHour = horaInicio,
+                                    startMinute = minutoInicio,
+                                    endHour = horaFim,
+                                    endMinute = minutoFim
                                 )
-                                val rests = if (
-                                    hasRestPeriod &&
-                                    (horaInicio != horaFim || minutoInicio != minutoFim)
-                                ) {
-                                    listOf(
-                                        com.example.data.db.RestingPeriodEntity(
-                                            label = "Descanso",
-                                            startHour = horaInicio,
-                                            startMinute = minutoInicio,
-                                            endHour = horaFim,
-                                            endMinute = minutoFim
-                                        )
-                                    )
-                                } else {
-                                    emptyList()
-                                }
-                                database.profileDao().upsertProfileWithRests(profile, rests)
-                            }
+                            )
+                        } else {
+                            emptyList()
+                        }
+                        val targetProfileId = database.profileDao()
+                            .upsertProfileWithRests(profile, rests)
 
                         val reminder = ReminderEntity(
                             profileId = targetProfileId,

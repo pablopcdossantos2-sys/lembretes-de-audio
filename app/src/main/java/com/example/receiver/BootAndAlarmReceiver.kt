@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.example.data.db.AppDatabase
+import com.example.data.db.ReminderScheduleAdapter
 import com.example.data.preferences.UserPreferencesRepository
 import com.example.domain.scheduler.ScheduleCalculator
 import com.example.service.AudioReminderService
@@ -134,9 +135,16 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
 
                     val now = ZonedDateTime.now()
                     val nowMillis = System.currentTimeMillis()
-                    val profiles = database.profileDao().getAllProfilesWithRests().map { it.toDomain() }
-                    val activeAudios = database.audioDao().getActiveAudios().map { it.toDomain() }
+                    val storedProfiles = database.profileDao().getAllProfilesWithRests().map { it.toDomain() }
+                    val storedAudios = database.audioDao().getActiveAudios().map { it.toDomain() }
                     val activeReminders = database.reminderDao().getActiveReminders()
+                    val scheduleData = ReminderScheduleAdapter.withLegacyReminders(
+                        profiles = storedProfiles,
+                        audios = storedAudios,
+                        reminders = activeReminders
+                    )
+                    val effectiveProfiles = scheduleData.profiles
+                    val effectiveAudios = scheduleData.audios
 
                     val snoozeUntilZoned = if (prefs.snoozeUntilEpochMillis > nowMillis) {
                         ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(prefs.snoozeUntilEpochMillis), java.time.ZoneId.systemDefault())

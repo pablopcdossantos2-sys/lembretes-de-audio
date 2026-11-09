@@ -61,3 +61,6 @@ Lembretes em Áudio é um aplicativo Android nativo, desenvolvido de forma indep
 O desenvolvimento contou com ferramentas de inteligência artificial generativa como recurso auxiliar, mantendo-se sob responsabilidade do autor a concepção, implementação, integração e verificação do projeto.
 
 Currículo Lattes: [http://lattes.cnpq.br/9500873674712528](http://lattes.cnpq.br/9500873674712528)
+
+
+**Agendamentos de gravações:** cada gravação possui um perfil próprio, com intervalo e período de descanso independentes. Quando mais de um lembrete vence no mesmo instante, os áudios são reproduzidos em sequência; a prioridade de perfil não elimina os demais lembretes.

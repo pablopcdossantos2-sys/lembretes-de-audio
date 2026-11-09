@@ -299,6 +299,99 @@ object ScheduleCalculator {
         return triggers.firstOrNull()
     }
 
+
+    /**
+     * Returns every independent profile whose schedule is due at [triggerTime].
+     * Priority is intentionally ignored: overlapping profiles are separate reminders.
+     */
+    fun getTriggersAt(
+        triggerTime: ZonedDateTime,
+        profiles: List<Profile>,
+        activeAudios: List<AudioItem>,
+        snoozeUntil: ZonedDateTime? = null,
+        lastSequentialIndex: Int = 0,
+        quietHoursEnabled: Boolean = false,
+        quietHoursStartHour: Int = 22,
+        quietHoursStartMinute: Int = 0,
+        quietHoursEndHour: Int = 7,
+        quietHoursEndMinute: Int = 0,
+        quietHoursDaysCsv: String = "1,2,3,4,5,6,7"
+    ): List<ScheduledTrigger> {
+        val enabledProfiles = profiles.filter { it.isEnabled }
+        if (enabledProfiles.isEmpty() || activeAudios.isEmpty()) return emptyList()
+        if (snoozeUntil != null && !triggerTime.isAfter(snoozeUntil)) return emptyList()
+
+        val localTime = triggerTime.toLocalTime()
+        if (isTimeInQuietHours(
+                time = localTime,
+                dayOfWeek = triggerTime.dayOfWeek,
+                enabled = quietHoursEnabled,
+                startHour = quietHoursStartHour,
+                startMinute = quietHoursStartMinute,
+                endHour = quietHoursEndHour,
+                endMinute = quietHoursEndMinute,
+                daysOfWeekCsv = quietHoursDaysCsv
+            )
+        ) return emptyList()
+
+        return enabledProfiles.sortedBy { it.id }.mapIndexedNotNull { index, profile ->
+            val windowStartDate = if (profile.crossesMidnight) {
+                when {
+                    !localTime.isBefore(profile.startTime) -> triggerTime.toLocalDate()
+                    !localTime.isAfter(profile.endTime) -> triggerTime.toLocalDate().minusDays(1)
+                    else -> null
+                }
+            } else {
+                if (!localTime.isBefore(profile.startTime) &&
+                    !localTime.isAfter(profile.endTime)
+                ) triggerTime.toLocalDate() else null
+            } ?: return@mapIndexedNotNull null
+
+            if (!profile.daysOfWeek.contains(windowStartDate.dayOfWeek)) {
+                return@mapIndexedNotNull null
+            }
+
+            val windowStart = ZonedDateTime.of(windowStartDate, profile.startTime, triggerTime.zone)
+            val windowEnd = if (profile.crossesMidnight) {
+                ZonedDateTime.of(windowStartDate.plusDays(1), profile.endTime, triggerTime.zone)
+            } else {
+                ZonedDateTime.of(windowStartDate, profile.endTime, triggerTime.zone)
+            }
+            if (triggerTime.isBefore(windowStart) || triggerTime.isAfter(windowEnd)) {
+                return@mapIndexedNotNull null
+            }
+            if (localTime.second != 0 || localTime.nano != 0) {
+                return@mapIndexedNotNull null
+            }
+
+            val interval = profile.intervalMinutes.toLong().coerceAtLeast(1L)
+            val elapsedMinutes = ChronoUnit.MINUTES.between(windowStart, triggerTime)
+            val isGridMark = elapsedMinutes >= 0 && elapsedMinutes % interval == 0L
+
+            val mergedRests = mergeRestingPeriods(profile.restingPeriods)
+            val isResting = isTimeInRestingPeriod(localTime, mergedRests)
+            val isRestEnd = profile.resumePolicy == ResumePolicy.AT_REST_END &&
+                mergedRests.any { it.endTime == localTime }
+            if ((!isGridMark && !isRestEnd) || isResting) {
+                return@mapIndexedNotNull null
+            }
+
+            val (audioId, audioLabel, isRandom) = selectAudioForProfile(
+                profile = profile,
+                activeAudios = activeAudios,
+                seqIndex = lastSequentialIndex + index
+            )
+            ScheduledTrigger(
+                triggerTime = triggerTime,
+                profileId = profile.id,
+                profileName = profile.name,
+                predictedAudioId = audioId,
+                predictedAudioLabel = audioLabel,
+                isRandomAudio = isRandom
+            )
+        }
+    }
+
     /**
      * Computes the next [count] valid triggers from [now].
      * Scans day-by-day up to 14 days ahead.
@@ -378,9 +471,8 @@ object ScheduleCalculator {
                             continue
                         }
 
-                        // Fix A3: Apenas o perfil vencedor para este horário específico pode gerar o disparo
-                        val winningProfile = findActiveProfileFor(currentInstant, enabledProfiles)
-                        if (winningProfile?.id == profile.id && currentInstant.isAfter(effectiveStart)) {
+                        // Cada perfil elegível conserva seus próprios horários de disparo.
+                        if (currentInstant.isAfter(effectiveStart)) {
                             val time = currentInstant.toLocalTime()
 
                             // Fix A4: Checa se está no Horário Silencioso Global
@@ -452,17 +544,14 @@ object ScheduleCalculator {
                 }
             }
 
-            // Desempate de mesmo horário: mantém o gatilho com maior prioridade de perfil
+            // Remove somente duplicatas do mesmo perfil e horário; nunca descarta
+            // um perfil diferente por coincidir com outro no mesmo instante.
             val deduplicated = candidatesForDay
-                .groupBy { it.triggerTime }
-                .map { (_, list) ->
-                    list.maxWithOrNull(
-                        compareBy<ScheduledTrigger> { trigger ->
-                            enabledProfiles.firstOrNull { it.id == trigger.profileId }?.priority ?: 0
-                        }.thenByDescending { it.profileId }
-                    )!!
-                }
-                .sortedBy { it.triggerTime }
+                .distinctBy { it.profileId to it.triggerTime.toInstant() }
+                .sortedWith(
+                    compareBy<ScheduledTrigger> { it.triggerTime }
+                        .thenBy { it.profileId }
+                )
 
             for (trig in deduplicated) {
                 if (triggers.size < count) {
