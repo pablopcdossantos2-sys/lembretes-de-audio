@@ -40,6 +40,11 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
+private data class PendingAlarmTrigger(
+    val expectedMillis: Long,
+    val enqueuedAtMillis: Long
+)
+
 class AudioReminderService : Service() {
 
     companion object {
@@ -47,6 +52,7 @@ class AudioReminderService : Service() {
         const val CHANNEL_ALERTS_ID = "audio_reminder_alerts"
         const val NOTIFICATION_ID_SERVICE = 1001
         const val NOTIFICATION_ID_ALERT = 1002
+        private const val PLAYBACK_COMPLETION_TIMEOUT_MS = 30L * 60L * 1000L
 
         const val ACTION_START_OR_REFRESH = "com.example.action.START_OR_REFRESH"
         const val ACTION_STOP_SERVICE = "com.example.action.STOP_SERVICE"
@@ -90,7 +96,7 @@ class AudioReminderService : Service() {
     private lateinit var database: AppDatabase
     private lateinit var preferencesRepo: UserPreferencesRepository
     private lateinit var playerManager: AudioPlayerManager
-    private val alarmTriggerChannel = Channel<Long>(Channel.UNLIMITED)
+    private val alarmTriggerChannel = Channel<PendingAlarmTrigger>(Channel.UNLIMITED)
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -102,8 +108,8 @@ class AudioReminderService : Service() {
         playerManager = (application as? AudioReminderApp)?.audioPlayerManager ?: AudioPlayerManager(this)
         createNotificationChannels()
         serviceScope.launch {
-            for (expectedMillis in alarmTriggerChannel) {
-                processAlarmTrigger(expectedMillis)
+            for (trigger in alarmTriggerChannel) {
+                processAlarmTrigger(trigger)
             }
         }
     }
@@ -175,7 +181,12 @@ class AudioReminderService : Service() {
     }
 
     private fun handleAlarmTrigger(expectedMillis: Long) {
-        val queued = alarmTriggerChannel.trySend(expectedMillis)
+        val queued = alarmTriggerChannel.trySend(
+            PendingAlarmTrigger(
+                expectedMillis = expectedMillis,
+                enqueuedAtMillis = System.currentTimeMillis()
+            )
+        )
         if (queued.isFailure) {
             AudioDiagnosticLogger.log(
                 level = DiagnosticLevel.ERROR,
@@ -190,14 +201,15 @@ class AudioReminderService : Service() {
      * Processes alarm events sequentially. Triggers received while another recording
      * is playing stay queued instead of being discarded.
      */
-    private suspend fun processAlarmTrigger(expectedMillis: Long) {
+    private suspend fun processAlarmTrigger(trigger: PendingAlarmTrigger) {
+        val expectedMillis = trigger.expectedMillis
         val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
         val wakeLock = try {
             powerManager?.newWakeLock(
                 android.os.PowerManager.PARTIAL_WAKE_LOCK,
                 "AudioReminder:PlaybackWakeLock"
             )?.apply {
-                acquire(180_000L)
+                acquire(PLAYBACK_COMPLETION_TIMEOUT_MS)
             }
         } catch (error: Exception) {
             AudioDiagnosticLogger.log(
@@ -242,7 +254,16 @@ class AudioReminderService : Service() {
                 now.withSecond(0).withNano(0)
             }
 
-            if (expectedMillis > 0L && (nowMillis - expectedMillis) > 900_000L) {
+            // Subtrai o tempo que o disparo passou aguardando na fila. Só é
+            // considerado perdido quando o próprio sistema o entrega muito tarde.
+            val queueWaitMillis = (nowMillis - trigger.enqueuedAtMillis).coerceAtLeast(0L)
+            val deliveryDelayMillis = if (expectedMillis > 0L) {
+                (nowMillis - expectedMillis - queueWaitMillis).coerceAtLeast(0L)
+            } else {
+                0L
+            }
+
+            if (expectedMillis > 0L && deliveryDelayMillis > 900_000L) {
                 val missedTime = ZonedDateTime.ofInstant(
                     Instant.ofEpochMilli(expectedMillis),
                     ZoneId.systemDefault()
@@ -250,7 +271,7 @@ class AudioReminderService : Service() {
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.WARN,
                     category = DiagnosticCategory.ALARM,
-                    message = "Lembrete com atraso excessivo de ${(nowMillis - expectedMillis) / 1000}s",
+                    message = "Lembrete entregue com atraso excessivo de ${deliveryDelayMillis / 1000}s",
                     details = "Esperado às ${missedTime.format(timeFormatter)}"
                 )
                 showAlertNotification(
@@ -406,8 +427,17 @@ class AudioReminderService : Service() {
                         prefs = prefs,
                         onPlaybackComplete = { playbackDone.complete(Unit) }
                     )
-                    kotlinx.coroutines.withTimeoutOrNull(60_000L) {
+                    val completed = kotlinx.coroutines.withTimeoutOrNull(PLAYBACK_COMPLETION_TIMEOUT_MS) {
                         playbackDone.await()
+                        true
+                    } ?: false
+                    if (!completed) {
+                        AudioDiagnosticLogger.log(
+                            level = DiagnosticLevel.ERROR,
+                            category = DiagnosticCategory.PLAYBACK,
+                            message = "Tempo máximo de reprodução excedido para ${profile.name}; interrompendo antes do próximo lembrete."
+                        )
+                        playerManager.stop()
                     }
                 } catch (playbackError: Exception) {
                     AudioDiagnosticLogger.log(
