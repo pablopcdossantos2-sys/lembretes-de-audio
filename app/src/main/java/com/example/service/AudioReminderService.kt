@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
@@ -52,6 +53,11 @@ class AudioReminderService : Service() {
         const val CHANNEL_ALERTS_ID = "audio_reminder_alerts"
         const val NOTIFICATION_ID_SERVICE = 1001
         const val NOTIFICATION_ID_ALERT = 1002
+        private val playbackBatchCancellationVersion = AtomicLong(0L)
+
+        fun cancelCurrentPlaybackBatch() {
+            playbackBatchCancellationVersion.incrementAndGet()
+        }
         private const val PLAYBACK_COMPLETION_TIMEOUT_MS = 30L * 60L * 1000L
 
         const val ACTION_START_OR_REFRESH = "com.example.action.START_OR_REFRESH"
@@ -142,6 +148,7 @@ class AudioReminderService : Service() {
             ACTION_STOP_SERVICE -> {
                 AudioDiagnosticLogger.logServiceEvent(ACTION_STOP_SERVICE, "Parando serviço de lembretes")
                 serviceScope.launch {
+                    cancelCurrentPlaybackBatch()
                     preferencesRepo.setAppMasterEnabled(false)
                     cancelExistingAlarm()
                     playerManager.stop()
@@ -153,6 +160,7 @@ class AudioReminderService : Service() {
                 val minutes = intent.getIntExtra(EXTRA_SNOOZE_MINUTES, 60)
                 AudioDiagnosticLogger.logServiceEvent(ACTION_SNOOZE, "Silenciando lembretes por $minutes minutos")
                 serviceScope.launch {
+                    cancelCurrentPlaybackBatch()
                     val snoozeUntil = System.currentTimeMillis() + (minutes * 60 * 1000L)
                     preferencesRepo.setSnoozeUntilEpochMillis(snoozeUntil)
                     playerManager.stop()
@@ -202,6 +210,7 @@ class AudioReminderService : Service() {
      * is playing stay queued instead of being discarded.
      */
     private suspend fun processAlarmTrigger(trigger: PendingAlarmTrigger) {
+        val batchCancellationVersion = playbackBatchCancellationVersion.get()
         val expectedMillis = trigger.expectedMillis
         val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
         val wakeLock = try {
@@ -399,6 +408,15 @@ class AudioReminderService : Service() {
             }
 
             for (profile in dueProfiles) {
+                if (playbackBatchCancellationVersion.get() != batchCancellationVersion) {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.INFO,
+                        category = DiagnosticCategory.PLAYBACK,
+                        message = "Sequência de lembretes interrompida pelo usuário."
+                    )
+                    break
+                }
+
                 val selectedAudio = selectAudioForPlayback(
                     profile = profile,
                     activeAudios = activeAudios,
@@ -438,6 +456,9 @@ class AudioReminderService : Service() {
                             message = "Tempo máximo de reprodução excedido para ${profile.name}; interrompendo antes do próximo lembrete."
                         )
                         playerManager.stop()
+                    }
+                    if (playbackBatchCancellationVersion.get() != batchCancellationVersion) {
+                        break
                     }
                 } catch (playbackError: Exception) {
                     AudioDiagnosticLogger.log(

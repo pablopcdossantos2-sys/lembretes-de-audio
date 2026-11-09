@@ -58,6 +58,7 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
             }
 
             ReminderNotificationHelper.ACTION_STOP_AUDIO_ALERT -> {
+                AudioReminderService.cancelCurrentPlaybackBatch()
                 ReminderNotificationHelper.cancelVisualAlert(context)
                 val app = context.applicationContext as? com.example.AudioReminderApp
                 app?.audioPlayerManager?.stop()
@@ -65,6 +66,7 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
             }
 
             ReminderNotificationHelper.ACTION_SNOOZE_10_MIN_ALERT -> {
+                AudioReminderService.cancelCurrentPlaybackBatch()
                 ReminderNotificationHelper.cancelVisualAlert(context)
                 val app = context.applicationContext as? com.example.AudioReminderApp
                 app?.audioPlayerManager?.stop()
