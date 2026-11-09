@@ -152,34 +152,6 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
                         ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(prefs.snoozeUntilEpochMillis), java.time.ZoneId.systemDefault())
                     } else null
 
-                    val effectiveProfiles = if (profiles.none { it.isEnabled } && activeReminders.isNotEmpty()) {
-                        activeReminders.map { rem ->
-                            com.example.domain.model.Profile(
-                                id = rem.id,
-                                name = rem.title,
-                                isEnabled = true,
-                                priority = 20,
-                                daysOfWeek = java.time.DayOfWeek.values().toSet(),
-                                startTime = java.time.LocalTime.of(0, 0),
-                                endTime = java.time.LocalTime.of(23, 59),
-                                intervalMinutes = rem.intervalMinutes,
-                                playbackOrder = com.example.domain.model.PlaybackOrder.SPECIFIC,
-                                specificAudioId = rem.id
-                            )
-                        }
-                    } else profiles
-
-                    val effectiveAudios = if (activeAudios.isEmpty() && activeReminders.isNotEmpty()) {
-                        activeReminders.map { rem ->
-                            com.example.domain.model.AudioItem(
-                                id = rem.id,
-                                uriString = rem.audioFilePath?.takeIf { java.io.File(it).exists() }?.let { "file://$it" } ?: rem.audioUri ?: "tts:${rem.title}",
-                                label = rem.title,
-                                isActive = true
-                            )
-                        }
-                    } else activeAudios
-
                     val nextTrigger = ScheduleCalculator.getNextTrigger(
                         now = now,
                         profiles = effectiveProfiles,
