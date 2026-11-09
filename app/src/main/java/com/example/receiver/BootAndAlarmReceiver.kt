@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.example.data.db.AppDatabase
+import com.example.data.db.ReminderScheduleAdapter
 import com.example.data.preferences.UserPreferencesRepository
 import com.example.domain.scheduler.ScheduleCalculator
 import com.example.service.AudioReminderService
@@ -57,6 +58,7 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
             }
 
             ReminderNotificationHelper.ACTION_STOP_AUDIO_ALERT -> {
+                AudioReminderService.cancelCurrentPlaybackBatch()
                 ReminderNotificationHelper.cancelVisualAlert(context)
                 val app = context.applicationContext as? com.example.AudioReminderApp
                 app?.audioPlayerManager?.stop()
@@ -64,6 +66,7 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
             }
 
             ReminderNotificationHelper.ACTION_SNOOZE_10_MIN_ALERT -> {
+                AudioReminderService.cancelCurrentPlaybackBatch()
                 ReminderNotificationHelper.cancelVisualAlert(context)
                 val app = context.applicationContext as? com.example.AudioReminderApp
                 app?.audioPlayerManager?.stop()
@@ -134,41 +137,20 @@ class BootAndAlarmReceiver : BroadcastReceiver() {
 
                     val now = ZonedDateTime.now()
                     val nowMillis = System.currentTimeMillis()
-                    val profiles = database.profileDao().getAllProfilesWithRests().map { it.toDomain() }
-                    val activeAudios = database.audioDao().getActiveAudios().map { it.toDomain() }
+                    val storedProfiles = database.profileDao().getAllProfilesWithRests().map { it.toDomain() }
+                    val storedAudios = database.audioDao().getActiveAudios().map { it.toDomain() }
                     val activeReminders = database.reminderDao().getActiveReminders()
+                    val scheduleData = ReminderScheduleAdapter.withLegacyReminders(
+                        profiles = storedProfiles,
+                        audios = storedAudios,
+                        reminders = activeReminders
+                    )
+                    val effectiveProfiles = scheduleData.profiles
+                    val effectiveAudios = scheduleData.audios
 
                     val snoozeUntilZoned = if (prefs.snoozeUntilEpochMillis > nowMillis) {
                         ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(prefs.snoozeUntilEpochMillis), java.time.ZoneId.systemDefault())
                     } else null
-
-                    val effectiveProfiles = if (profiles.none { it.isEnabled } && activeReminders.isNotEmpty()) {
-                        activeReminders.map { rem ->
-                            com.example.domain.model.Profile(
-                                id = rem.id,
-                                name = rem.title,
-                                isEnabled = true,
-                                priority = 20,
-                                daysOfWeek = java.time.DayOfWeek.values().toSet(),
-                                startTime = java.time.LocalTime.of(0, 0),
-                                endTime = java.time.LocalTime.of(23, 59),
-                                intervalMinutes = rem.intervalMinutes,
-                                playbackOrder = com.example.domain.model.PlaybackOrder.SPECIFIC,
-                                specificAudioId = rem.id
-                            )
-                        }
-                    } else profiles
-
-                    val effectiveAudios = if (activeAudios.isEmpty() && activeReminders.isNotEmpty()) {
-                        activeReminders.map { rem ->
-                            com.example.domain.model.AudioItem(
-                                id = rem.id,
-                                uriString = rem.audioFilePath?.takeIf { java.io.File(it).exists() }?.let { "file://$it" } ?: rem.audioUri ?: "tts:${rem.title}",
-                                label = rem.title,
-                                isActive = true
-                            )
-                        }
-                    } else activeAudios
 
                     val nextTrigger = ScheduleCalculator.getNextTrigger(
                         now = now,

@@ -182,7 +182,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val conflictingDays = dayCoverage.filter { it.value.size > 1 }
         val conflictWarning = if (conflictingDays.isNotEmpty()) {
             val dayNames = conflictingDays.keys.joinToString(", ") { getDayOfWeekAbbreviation(it) }
-            "Conflito de dias ($dayNames): prevalece o perfil de maior prioridade."
+            "Agendamentos independentes em dias coincidentes ($dayNames): se os horários coincidirem, os áudios serão reproduzidos em sequência."
         } else null
 
         MainUiState(

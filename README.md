@@ -22,7 +22,7 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
 2. **Biblioteca de Áudios Completa:**
    - **Gravação de Áudio com Microfone:** Gravador integrado com visualizador de onda em tempo real, temporizador, pause/resume e reprodução de prévia.
    - **Importação de Arquivos:** Suporte a arquivos locais (MP3, WAV, M4A, OGG) via seletor de arquivos do sistema.
-   - **Texto para Fala (TTS):** Síntese de voz nativa do Android (Text-to-Speech); vozes e idiomas disponíveis dependem da configuração do dispositivo.
+   - **Texto para Fala (TTS):** Síntese de voz nativa do Android em tempo real; o texto é falado durante a reprodução e não gera, por si só, um arquivo de áudio. Vozes e idiomas disponíveis dependem da configuração do dispositivo.
    - Controle individual de volume (0 a 100%) e peso no sorteio para cada áudio.
 
 3. **Arquitetura e Robustez em Segundo Plano:**
@@ -34,7 +34,7 @@ Aplicativo Android nativo moderno desenvolvido em **Kotlin** e **Jetpack Compose
 
 4. **Backup e Portabilidade:**
    - Exportação/importação de preferências, perfis, períodos de descanso, metadados dos áudios e lembretes em JSON.
-   - **Limitação atual:** o JSON não inclui os bytes dos arquivos de áudio locais. Após importar em outro dispositivo, os arquivos precisam ser copiados/importados novamente; referências a arquivos ausentes são desativadas para evitar falhas de reprodução.
+   - Arquivos de áudio locais elegíveis são incorporados ao JSON em Base64 (limite atual de 10 MB por arquivo). Arquivos maiores ou inacessíveis podem ser exportados apenas como referência, que poderá ficar ausente em outro dispositivo.
 
 ---
 
@@ -51,7 +51,7 @@ A interface oferece seleção de idioma entre **português do Brasil (PT-BR), in
 - **Banco de Dados:** Room Database
 - **Preferências:** Jetpack DataStore Preferences
 - **Segundo Plano:** WorkManager, Foreground Service, BroadcastReceivers
-- **Áudio:** Android MediaPlayer, AudioFocusManager, TextToSpeech
+- **Áudio:** Android MediaPlayer, gerenciamento de foco de áudio dentro de `AudioPlayerManager`, TextToSpeech
 
 
 ## 👤 Autoria e desenvolvimento
@@ -61,3 +61,6 @@ Lembretes em Áudio é um aplicativo Android nativo, desenvolvido de forma indep
 O desenvolvimento contou com ferramentas de inteligência artificial generativa como recurso auxiliar, mantendo-se sob responsabilidade do autor a concepção, implementação, integração e verificação do projeto.
 
 Currículo Lattes: [http://lattes.cnpq.br/9500873674712528](http://lattes.cnpq.br/9500873674712528)
+
+
+**Agendamentos de gravações:** cada gravação possui um perfil próprio, com intervalo e período de descanso independentes. Quando mais de um lembrete vence no mesmo instante, os áudios são reproduzidos em sequência; a prioridade de perfil não elimina os demais lembretes.

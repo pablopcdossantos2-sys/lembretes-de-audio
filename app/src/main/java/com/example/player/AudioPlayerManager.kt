@@ -35,16 +35,23 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     private var mediaPlayer: MediaPlayer? = null
     private var textToSpeech: TextToSpeech? = null
     private var isTtsInitialized = false
-    private var pendingTtsText: String? = null
-    private var pendingTtsOnComplete: (() -> Unit)? = null
+    private data class PendingTtsRequest(
+        val text: String,
+        val volume: Float,
+        val useAppVolumeOnly: Boolean,
+        val onComplete: () -> Unit,
+        val retryCount: Int = 0
+    )
+    private var pendingTtsRequest: PendingTtsRequest? = null
+    private var ttsInitializationWatchdog: Runnable? = null
 
     private var audioFocusRequest: AudioFocusRequest? = null
     private var currentFadeJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var ttsWatchdogRunnable: Runnable? = null
+    private var activePlaybackCompletion: (() -> Unit)? = null
 
-    private var previousAlarmVolume: Int? = null
     private var previousMusicVolume: Int? = null
     private var currentVolumeFraction: Float = 1.0f
     private var isPausedDueToAudioFocus: Boolean = false
@@ -65,47 +72,117 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            isTtsInitialized = true
             try {
-                val locale = Locale.forLanguageTag("pt-BR")
-                var langResult = textToSpeech?.setLanguage(locale)
-                if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    val defaultLocale = Locale.getDefault()
-                    val defResult = textToSpeech?.setLanguage(defaultLocale)
-                    if (defResult == TextToSpeech.LANG_MISSING_DATA || defResult == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        langResult = textToSpeech?.setLanguage(Locale.US)
-                    } else {
-                        langResult = defResult
-                    }
+                var languageResult = textToSpeech?.setLanguage(Locale.forLanguageTag("pt-BR"))
+                    ?: TextToSpeech.LANG_NOT_SUPPORTED
+                if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
+                    languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    languageResult = textToSpeech?.setLanguage(Locale.getDefault())
+                        ?: TextToSpeech.LANG_NOT_SUPPORTED
                 }
-                AudioDiagnosticLogger.log(
-                    level = DiagnosticLevel.INFO,
-                    category = DiagnosticCategory.PLAYBACK,
-                    message = "Sintetizador TTS inicializado com sucesso",
-                    details = "Status de idioma: $langResult"
-                )
-                textToSpeech?.setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                )
+                if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
+                    languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    languageResult = textToSpeech?.setLanguage(Locale.US)
+                        ?: TextToSpeech.LANG_NOT_SUPPORTED
+                }
+
+                isTtsInitialized = languageResult >= TextToSpeech.LANG_AVAILABLE
+                if (isTtsInitialized) {
+                    textToSpeech?.setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                    )
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.INFO,
+                        category = DiagnosticCategory.PLAYBACK,
+                        message = "Sintetizador TTS inicializado com sucesso",
+                        details = "Status de idioma: $languageResult"
+                    )
+                } else {
+                    AudioDiagnosticLogger.log(
+                        level = DiagnosticLevel.WARN,
+                        category = DiagnosticCategory.PLAYBACK,
+                        message = "Nenhuma voz compatível está disponível no dispositivo",
+                        details = "Status de idioma: $languageResult"
+                    )
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "Could not set TTS audio attributes", e)
-            }
-            pendingTtsText?.let { text ->
-                val callback = pendingTtsOnComplete
-                pendingTtsText = null
-                pendingTtsOnComplete = null
-                speakTts(text, onComplete = callback ?: {})
+                isTtsInitialized = false
+                Log.w(TAG, "Could not configure TTS language or audio attributes", e)
             }
         } else {
+            isTtsInitialized = false
             AudioDiagnosticLogger.log(
                 level = DiagnosticLevel.WARN,
                 category = DiagnosticCategory.PLAYBACK,
                 message = "TTS inicializado com código de status não-sucesso ($status)",
-                details = "Disparos de voz sintetizada usarão tom sonoro alternativo"
+                details = "O motor será recriado uma vez antes de usar o som alternativo"
             )
+        }
+
+        val pending = pendingTtsRequest ?: return
+        ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
+        ttsInitializationWatchdog = null
+        pendingTtsRequest = null
+
+        if (isTtsInitialized) {
+            speakTtsInternal(pending)
+        } else {
+            retryTtsOrFallback(pending, "Falha ao inicializar o motor ou idioma TTS")
+        }
+    }
+
+    private fun recreateTtsEngine() {
+        isTtsInitialized = false
+        try { textToSpeech?.stop() } catch (_: Exception) {}
+        try { textToSpeech?.shutdown() } catch (_: Exception) {}
+        textToSpeech = null
+
+        try {
+            textToSpeech = TextToSpeech(context.applicationContext, this)
+        } catch (error: Exception) {
+            Log.e(TAG, "Could not recreate TextToSpeech engine", error)
+            val pending = pendingTtsRequest
+            pendingTtsRequest = null
+            if (pending != null) {
+                playFallbackTone(pending.volume, pending.onComplete)
+            }
+        }
+    }
+
+    private fun queueTtsInitialization(request: PendingTtsRequest) {
+        pendingTtsRequest = request
+        ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
+
+        val watchdog = Runnable {
+            val pending = pendingTtsRequest
+            if (pending === request) {
+                pendingTtsRequest = null
+                retryTtsOrFallback(
+                    request,
+                    "Timeout de 2,5s na inicialização do motor TTS"
+                )
+            }
+        }
+        ttsInitializationWatchdog = watchdog
+        mainHandler.postDelayed(watchdog, 2500L)
+    }
+
+    private fun retryTtsOrFallback(request: PendingTtsRequest, reason: String) {
+        AudioDiagnosticLogger.logPlaybackError("TTS: ${request.text}", reason)
+        if (request.retryCount < 1) {
+            val retry = request.copy(retryCount = request.retryCount + 1)
+            queueTtsInitialization(retry)
+            recreateTtsEngine()
+        } else {
+            pendingTtsRequest = null
+            ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
+            ttsInitializationWatchdog = null
+            playFallbackTone(request.volume, request.onComplete)
         }
     }
 
@@ -120,7 +197,6 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             // Unmute streams if currently muted
             try {
                 audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
-                audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_UNMUTE, 0)
             } catch (_: Exception) {}
 
             val targetStream = AudioManager.STREAM_MUSIC
@@ -148,18 +224,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 )
             }
 
-            // Garante também volume no stream de alarmes de forma segura
-            try {
-                val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-                val currentAlarm = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
-                if (currentAlarm < (maxAlarm * 0.5f).toInt()) {
-                    if (previousAlarmVolume == null) {
-                        previousAlarmVolume = currentAlarm
-                    }
-                    val desiredAlarm = (maxAlarm * volumeFraction).toInt().coerceIn(1, maxAlarm)
-                    audioManager.setStreamVolume(AudioManager.STREAM_ALARM, desiredAlarm, 0)
-                }
-            } catch (_: Exception) {}
+
         } catch (e: Exception) {
             Log.w(TAG, "Não foi possível ajustar volume de áudio", e)
         }
@@ -167,10 +232,6 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
 
     private fun restoreSpeakerVolume() {
         try {
-            previousAlarmVolume?.let { prev ->
-                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, prev, 0)
-                previousAlarmVolume = null
-            }
             previousMusicVolume?.let { prev ->
                 audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, prev, 0)
                 previousMusicVolume = null
@@ -189,8 +250,23 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
         ttsText: String? = null,
         onComplete: () -> Unit = {}
     ) {
+        lateinit var playbackCompletion: () -> Unit
+        var completionInitialized = false
         try {
             stop()
+
+            var hasCompleted = false
+            playbackCompletion = {
+                if (!hasCompleted) {
+                    hasCompleted = true
+                    if (activePlaybackCompletion === playbackCompletion) {
+                        activePlaybackCompletion = null
+                    }
+                    onComplete()
+                }
+            }
+            completionInitialized = true
+            activePlaybackCompletion = playbackCompletion
 
             val isHeadphones = try { DeviceStateHelper.isHeadphonesConnected(context) } catch (_: Throwable) { false }
             val deviceDesc = try { DeviceStateHelper.getConnectedAudioDevicesDescription(context) } catch (_: Throwable) { "Alto-falante do Celular" }
@@ -201,7 +277,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             val clampedTargetVolume = targetVolume.coerceIn(0.1f, 1.0f)
             try { prepareAudioVolume(clampedTargetVolume, useAppVolumeOnly, isHeadphones) } catch (_: Throwable) {}
 
-            val streamTypeStr = if (isHeadphones) "STREAM_MUSIC (Fones)" else "STREAM_ALARM / STREAM_MUSIC (Alto-falante)"
+            val streamTypeStr = if (isHeadphones) "STREAM_MUSIC (Fones)" else "STREAM_MUSIC (Alto-falante)"
             try {
                 AudioDiagnosticLogger.logPlaybackStart(
                     title = audioTitle,
@@ -231,7 +307,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                     audioTitle = audioTitle,
                     clampedTargetVolume = clampedTargetVolume,
                     fadeInDurationMs = fadeInDurationMs,
-                    onComplete = onComplete
+                    onComplete = playbackCompletion
                 )
                 return
             }
@@ -244,7 +320,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                     audioTitle = audioTitle,
                     clampedTargetVolume = clampedTargetVolume,
                     fadeInDurationMs = fadeInDurationMs,
-                    onComplete = onComplete
+                    onComplete = playbackCompletion
                 )
                 return
             }
@@ -287,12 +363,12 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                                 text = textToSpeak,
                                 volume = clampedTargetVolume,
                                 useAppVolumeOnly = useAppVolumeOnly,
-                                onComplete = onComplete
+                                onComplete = playbackCompletion
                             )
                         } else {
                             restoreSpeakerVolume()
                             abandonAudioFocus()
-                            onComplete()
+                            playbackCompletion()
                         }
                     }
                 )
@@ -302,17 +378,22 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             // Caso contrário, sintetiza diretamente via TTS com watchdog timeout
             val textToSpeak = when {
                 !ttsText.isNullOrBlank() -> ttsText
-                else -> uriString.removePrefix("tts:").replace("_", " ")
+                uriString.startsWith("tts:") -> uriString.removePrefix("tts:").replace("_", " ")
+                audioTitle.isNotBlank() -> audioTitle
+                else -> "Lembrete em áudio"
             }
             speakTts(
                 text = textToSpeak,
                 volume = clampedTargetVolume,
                 useAppVolumeOnly = useAppVolumeOnly,
-                onComplete = onComplete
+                onComplete = playbackCompletion
             )
         } catch (e: Throwable) {
             Log.e(TAG, "playAudio critical exception", e)
-            playFallbackTone(targetVolume.coerceIn(0.1f, 1.0f), onComplete)
+            playFallbackTone(
+                targetVolume.coerceIn(0.1f, 1.0f),
+                if (completionInitialized) playbackCompletion else onComplete
+            )
         }
     }
 
@@ -433,58 +514,54 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
         useAppVolumeOnly: Boolean = false,
         onComplete: () -> Unit = {}
     ) {
-        val clampedVol = volume.coerceIn(0.1f, 1.0f)
-        val isHeadphones = DeviceStateHelper.isHeadphonesConnected(context)
-
-        if (!isTtsInitialized || textToSpeech == null) {
-            AudioDiagnosticLogger.log(
-                level = DiagnosticLevel.INFO,
-                category = DiagnosticCategory.PLAYBACK,
-                message = "Aguardando inicialização do TTS para falar: \"$text\"",
-                details = "Texto colocado na fila de inicialização"
+        speakTtsInternal(
+            PendingTtsRequest(
+                text = text,
+                volume = volume.coerceIn(0.1f, 1.0f),
+                useAppVolumeOnly = useAppVolumeOnly,
+                onComplete = onComplete
             )
-            pendingTtsText = text
-            pendingTtsOnComplete = onComplete
-            // Timeout seguro caso o TTS nunca responda
-            mainHandler.postDelayed({
-                if (pendingTtsText != null) {
-                    AudioDiagnosticLogger.log(
-                        level = DiagnosticLevel.WARN,
-                        category = DiagnosticCategory.PLAYBACK,
-                        message = "Timeout na inicialização do TTS (2.5s), tocando som alternativo",
-                        details = "Garante que o usuário ouça o lembrete mesmo sem motor de voz"
-                    )
-                    pendingTtsText = null
-                    pendingTtsOnComplete = null
-                    playFallbackTone(clampedVol, onComplete)
-                }
-            }, 2500L)
+        )
+    }
+
+    private fun speakTtsInternal(request: PendingTtsRequest) {
+        if (!isTtsInitialized || textToSpeech == null) {
+            queueTtsInitialization(request)
             return
         }
 
-        prepareAudioVolume(clampedVol, useAppVolumeOnly, isHeadphones)
+        val clampedVol = request.volume
+        val text = request.text
+        val onComplete = request.onComplete
+        val isHeadphones = DeviceStateHelper.isHeadphonesConnected(context)
+
+        prepareAudioVolume(clampedVol, request.useAppVolumeOnly, isHeadphones)
         requestAudioFocus(isHeadphones)
         val utteranceId = "tts_${System.currentTimeMillis()}"
         val startTimeMs = System.currentTimeMillis()
-
         var hasFinished = false
 
-        // Watchdog timeout para o TTS: se a síntese de voz travar ou não emitir callbacks dentro de 4s, executa fallback
+        val timeoutDelay = (3000L + 90L * text.length).coerceIn(4000L, 60_000L)
         val watchdogRunnable = Runnable {
             if (!hasFinished) {
                 hasFinished = true
-                AudioDiagnosticLogger.logPlaybackError("TTS: $text", "Timeout de execução do sintetizador TTS (4s)")
-                playFallbackTone(clampedVol, onComplete)
+                AudioDiagnosticLogger.logPlaybackError(
+                    "TTS: $text",
+                    "Timeout de execução do sintetizador TTS (${timeoutDelay}ms)"
+                )
+                try { textToSpeech?.stop() } catch (_: Exception) {}
+                retryTtsOrFallback(request, "Timeout de execução do sintetizador TTS")
             }
         }
+
         ttsWatchdogRunnable?.let(mainHandler::removeCallbacks)
         ttsWatchdogRunnable = watchdogRunnable
-        mainHandler.postDelayed(watchdogRunnable, (3000L + 90L * text.length).coerceIn(4000L, 60_000L))
+        mainHandler.postDelayed(watchdogRunnable, timeoutDelay)
 
         textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 mainHandler.removeCallbacks(watchdogRunnable)
-                mainHandler.postDelayed(watchdogRunnable, (3000L + 90L * text.length).coerceIn(4000L, 60_000L))
+                mainHandler.postDelayed(watchdogRunnable, timeoutDelay)
                 AudioDiagnosticLogger.log(
                     level = DiagnosticLevel.INFO,
                     category = DiagnosticCategory.PLAYBACK,
@@ -499,8 +576,8 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 if (!hasFinished) {
                     hasFinished = true
                     mainHandler.post {
-                        val dur = System.currentTimeMillis() - startTimeMs
-                        AudioDiagnosticLogger.logPlaybackEnd("TTS: $text", dur, success = true)
+                        val duration = System.currentTimeMillis() - startTimeMs
+                        AudioDiagnosticLogger.logPlaybackEnd("TTS: $text", duration, success = true)
                         restoreSpeakerVolume()
                         abandonAudioFocus()
                         onComplete()
@@ -509,35 +586,59 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
             }
 
             override fun onError(utteranceId: String?) {
+                handleUtteranceError("Erro na síntese de fala do TTS")
+            }
+
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                handleUtteranceError("Erro na síntese de fala do TTS (código $errorCode)")
+            }
+
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {
                 mainHandler.removeCallbacks(watchdogRunnable)
+                if (ttsWatchdogRunnable === watchdogRunnable) ttsWatchdogRunnable = null
                 if (!hasFinished) {
                     hasFinished = true
                     mainHandler.post {
-                        AudioDiagnosticLogger.logPlaybackError("TTS: $text", "Erro na síntese de fala do TTS")
                         restoreSpeakerVolume()
                         abandonAudioFocus()
-                        playFallbackTone(clampedVol, onComplete)
+                        onComplete()
+                    }
+                }
+            }
+
+            private fun handleUtteranceError(reason: String) {
+                mainHandler.removeCallbacks(watchdogRunnable)
+                if (ttsWatchdogRunnable === watchdogRunnable) ttsWatchdogRunnable = null
+                if (!hasFinished) {
+                    hasFinished = true
+                    mainHandler.post {
+                        retryTtsOrFallback(request, reason)
                     }
                 }
             }
         })
 
-        val streamType = AudioManager.STREAM_MUSIC
-        val params = android.os.Bundle()
-        params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, clampedVol)
-        params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, streamType)
+        val params = android.os.Bundle().apply {
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, clampedVol)
+            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+        }
 
-        val speakResult = textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        val speakResult = textToSpeech?.speak(
+            text,
+            TextToSpeech.QUEUE_FLUSH,
+            params,
+            utteranceId
+        )
         if (speakResult != TextToSpeech.SUCCESS) {
             mainHandler.removeCallbacks(watchdogRunnable)
             if (ttsWatchdogRunnable === watchdogRunnable) ttsWatchdogRunnable = null
-            hasFinished = true
-            AudioDiagnosticLogger.logPlaybackError(
-                title = "TTS: $text",
-                errorMessage = "Chamada a speak() retornou código de erro: $speakResult",
-                details = "Executando tom de alarme sonoro como fallback"
-            )
-            playFallbackTone(clampedVol, onComplete)
+            if (!hasFinished) {
+                hasFinished = true
+                retryTtsOrFallback(
+                    request,
+                    "Chamada a speak() retornou código de erro: $speakResult"
+                )
+            }
         }
     }
 
@@ -659,6 +760,11 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
     }
 
     fun stop() {
+        val completion = activePlaybackCompletion
+        activePlaybackCompletion = null
+        ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
+        ttsInitializationWatchdog = null
+        pendingTtsRequest = null
         ttsWatchdogRunnable?.let(mainHandler::removeCallbacks)
         ttsWatchdogRunnable = null
         currentFadeJob?.cancel()
@@ -679,6 +785,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
         isPausedDueToAudioFocus = false
         restoreSpeakerVolume()
         abandonAudioFocus()
+        completion?.invoke()
     }
 
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
@@ -723,7 +830,7 @@ class AudioPlayerManager(private val context: Context) : TextToSpeech.OnInitList
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
                 )
                 .setOnAudioFocusChangeListener(audioFocusChangeListener)

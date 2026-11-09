@@ -431,5 +431,154 @@ class ScheduleCalculatorTest {
         assertEquals(LocalTime.of(1, 0), triggers[2].triggerTime.toLocalTime())
     }
 
+
+    @Test
+    fun overlappingProfilesKeepBothTriggersAtSameInstant() {
+        val zone = ZoneId.of("America/Sao_Paulo")
+        val lowerPriority = Profile(
+            id = 11L,
+            name = "Gravação A",
+            priority = 1,
+            daysOfWeek = setOf(DayOfWeek.MONDAY),
+            startTime = LocalTime.of(8, 0),
+            endTime = LocalTime.of(18, 0),
+            intervalMinutes = 10,
+            playbackOrder = PlaybackOrder.SPECIFIC,
+            specificAudioId = 1L,
+            audioIds = listOf(1L)
+        )
+        val higherPriority = Profile(
+            id = 22L,
+            name = "Gravação B",
+            priority = 99,
+            daysOfWeek = setOf(DayOfWeek.MONDAY),
+            startTime = LocalTime.of(8, 0),
+            endTime = LocalTime.of(18, 0),
+            intervalMinutes = 5,
+            playbackOrder = PlaybackOrder.SPECIFIC,
+            specificAudioId = 2L,
+            audioIds = listOf(2L)
+        )
+        val audios = listOf(
+            testAudio.copy(id = 1L, label = "Áudio A"),
+            testAudio.copy(id = 2L, label = "Áudio B")
+        )
+        val now = ZonedDateTime.of(LocalDate.of(2026, 10, 12), LocalTime.of(7, 59), zone)
+
+        val triggers = ScheduleCalculator.getNextNTriggers(
+            now = now,
+            count = 2,
+            profiles = listOf(higherPriority, lowerPriority),
+            activeAudios = audios
+        )
+
+        assertEquals(2, triggers.size)
+        assertEquals(listOf(11L, 22L), triggers.map { it.profileId })
+        assertEquals(
+            listOf(LocalTime.of(8, 0), LocalTime.of(8, 0)),
+            triggers.map { it.triggerTime.toLocalTime() }
+        )
+    }
+
+    @Test
+    fun getTriggersAtReturnsEveryProfileDueAtThatInstant() {
+        val zone = ZoneId.of("America/Sao_Paulo")
+        val triggerTime = ZonedDateTime.of(
+            LocalDate.of(2026, 10, 12),
+            LocalTime.of(8, 10),
+            zone
+        )
+        val first = Profile(
+            id = 31L,
+            name = "A cada 10 minutos",
+            priority = 1,
+            daysOfWeek = setOf(DayOfWeek.MONDAY),
+            startTime = LocalTime.of(8, 0),
+            endTime = LocalTime.of(18, 0),
+            intervalMinutes = 10,
+            playbackOrder = PlaybackOrder.SPECIFIC,
+            specificAudioId = 1L,
+            audioIds = listOf(1L)
+        )
+        val second = Profile(
+            id = 32L,
+            name = "A cada 5 minutos",
+            priority = 100,
+            daysOfWeek = setOf(DayOfWeek.MONDAY),
+            startTime = LocalTime.of(8, 0),
+            endTime = LocalTime.of(18, 0),
+            intervalMinutes = 5,
+            playbackOrder = PlaybackOrder.SPECIFIC,
+            specificAudioId = 2L,
+            audioIds = listOf(2L)
+        )
+        val audios = listOf(
+            testAudio.copy(id = 1L, label = "Áudio A"),
+            testAudio.copy(id = 2L, label = "Áudio B")
+        )
+
+        val due = ScheduleCalculator.getTriggersAt(
+            triggerTime = triggerTime,
+            profiles = listOf(first, second),
+            activeAudios = audios
+        )
+
+        assertEquals(2, due.size)
+        assertEquals(listOf(31L, 32L), due.map { it.profileId })
+        assertEquals(listOf(1L, 2L), due.map { it.predictedAudioId })
+    }
+
+    @Test
+    fun getTriggersAtHonorsEachProfilesRestPeriodIndependently() {
+        val zone = ZoneId.of("America/Sao_Paulo")
+        val triggerTime = ZonedDateTime.of(
+            LocalDate.of(2026, 10, 12),
+            LocalTime.of(12, 30),
+            zone
+        )
+        val restingProfile = Profile(
+            id = 41L,
+            name = "Com descanso",
+            daysOfWeek = setOf(DayOfWeek.MONDAY),
+            startTime = LocalTime.of(8, 0),
+            endTime = LocalTime.of(18, 0),
+            intervalMinutes = 30,
+            playbackOrder = PlaybackOrder.SPECIFIC,
+            specificAudioId = 1L,
+            audioIds = listOf(1L),
+            restingPeriods = listOf(
+                RestingPeriod(
+                    label = "Almoço",
+                    startTime = LocalTime.of(12, 0),
+                    endTime = LocalTime.of(13, 0)
+                )
+            )
+        )
+        val unrestrictedProfile = Profile(
+            id = 42L,
+            name = "Sem descanso",
+            daysOfWeek = setOf(DayOfWeek.MONDAY),
+            startTime = LocalTime.of(8, 0),
+            endTime = LocalTime.of(18, 0),
+            intervalMinutes = 30,
+            playbackOrder = PlaybackOrder.SPECIFIC,
+            specificAudioId = 2L,
+            audioIds = listOf(2L)
+        )
+        val audios = listOf(
+            testAudio.copy(id = 1L, label = "Áudio A"),
+            testAudio.copy(id = 2L, label = "Áudio B")
+        )
+
+        val due = ScheduleCalculator.getTriggersAt(
+            triggerTime = triggerTime,
+            profiles = listOf(restingProfile, unrestrictedProfile),
+            activeAudios = audios
+        )
+
+        assertEquals(listOf(42L), due.map { it.profileId })
+    }
+
+
 }
 

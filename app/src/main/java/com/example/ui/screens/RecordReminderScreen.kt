@@ -181,8 +181,6 @@ fun RecordReminderScreen(
     var isPlayingPreview by remember { mutableStateOf(false) }
 
     // Reminder Metadata form fields
-    val availableProfiles by lembreteViewModel.profilesState.collectAsStateWithLifecycle()
-    var selectedProfileId by remember { mutableStateOf<Long?>(null) }
     var title by remember { mutableStateOf("") }
     var periodicityMinutes by remember { mutableIntStateOf(15) }
     var hasRestPeriod by remember { mutableStateOf(false) } // Padrão: SEM descanso programado
@@ -191,6 +189,7 @@ fun RecordReminderScreen(
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
+    var isFinalizing by remember { mutableStateOf(false) }
 
     // Cleanup when leaving screen
     DisposableEffect(Unit) {
@@ -500,9 +499,15 @@ fun RecordReminderScreen(
                                 // Stop / Finish Button
                                 Button(
                                     onClick = {
-                                        recorderHelper.stopRecording()
-                                        currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
-                                        recordingStatus = RecordingStatus.FINISHED
+                                        if (!isFinalizing) {
+                                            isFinalizing = true
+                                            scope.launch {
+                                                recorderHelper.stopRecordingAndAwait()
+                                                currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
+                                                recordingStatus = RecordingStatus.FINISHED
+                                                isFinalizing = false
+                                            }
+                                        }
                                     },
                                     modifier = Modifier
                                         .size(72.dp)
@@ -549,9 +554,15 @@ fun RecordReminderScreen(
                                 // Stop / Finish Button
                                 Button(
                                     onClick = {
-                                        recorderHelper.stopRecording()
-                                        currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
-                                        recordingStatus = RecordingStatus.FINISHED
+                                        if (!isFinalizing) {
+                                            isFinalizing = true
+                                            scope.launch {
+                                                recorderHelper.stopRecordingAndAwait()
+                                                currentFile = recorderHelper.getCurrentOutputFile() ?: currentFile
+                                                recordingStatus = RecordingStatus.FINISHED
+                                                isFinalizing = false
+                                            }
+                                        }
                                     },
                                     modifier = Modifier
                                         .size(72.dp)
@@ -651,44 +662,7 @@ fun RecordReminderScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        // 1. Vínculo ao Perfil de Usuário
-                        Text(
-                        text = tr("Perfil de Usuário:"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            FilterChip(
-                                selected = selectedProfileId == null,
-                                onClick = { selectedProfileId = null },
-                                label = { Text(tr("Novo Perfil Individual")) },
-                                leadingIcon = if (selectedProfileId == null) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                } else null,
-                                modifier = Modifier.testTag("profile_chip_new")
-                            )
-
-                            availableProfiles.forEach { profileWithRests ->
-                                val p = profileWithRests.profile
-                                FilterChip(
-                                    selected = selectedProfileId == p.id,
-                                    onClick = { selectedProfileId = p.id },
-                                    label = { Text(p.name) },
-                                    leadingIcon = if (selectedProfileId == p.id) {
-                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                    } else {
-                                        { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                    },
-                                    modifier = Modifier.testTag("profile_chip_${p.id}")
-                                )
-                            }
-                        }
-
-                        // 2. Título do Lembrete
+                        // 1. Título do Lembrete
                         OutlinedTextField(
                             value = title,
                             onValueChange = { title = it },
@@ -701,7 +675,7 @@ fun RecordReminderScreen(
                             shape = RoundedCornerShape(12.dp)
                         )
 
-                        // 3. Periodicidade Individual
+                        // 2. Periodicidade Individual
                         Text(
                         text = tr("Periodicidade:"),
                             style = MaterialTheme.typography.bodyMedium,
@@ -729,7 +703,7 @@ fun RecordReminderScreen(
                             }
                         }
 
-                        // 4. Período de Descanso (Opcional - desligado por padrão)
+                        // 3. Período de Descanso (Opcional - desligado por padrão)
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -841,7 +815,7 @@ fun RecordReminderScreen(
                             }
                         }
 
-                        if (isSaving) {
+                        if (isSaving || isFinalizing) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
 
@@ -853,7 +827,6 @@ fun RecordReminderScreen(
                                     titulo = title.ifBlank { "Lembrete Gravado" },
                                     arquivoAudio = file,
                                     periodicidadeMinutos = periodicityMinutes,
-                                    selectedProfileId = selectedProfileId,
                                     hasRestPeriod = hasRestPeriod,
                                     horaInicio = startTime.hour,
                                     minutoInicio = startTime.minute,
@@ -862,13 +835,19 @@ fun RecordReminderScreen(
                                     onSucesso = {
                                         isSaving = false
                                         scope.launch {
-                                            snackbarHostState.showSnackbar("Lembrete salvo com sucesso no banco Room!")
+                                            snackbarHostState.showSnackbar("Lembrete salvo com sucesso!")
+                                            onNavigateBack()
                                         }
-                                        onNavigateBack()
+                                    },
+                                    onErro = { mensagem ->
+                                        isSaving = false
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Não foi possível salvar: $mensagem")
+                                        }
                                     }
                                 )
                             },
-                            enabled = !isSaving && currentFile != null,
+                            enabled = !isSaving && !isFinalizing && currentFile != null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp)
